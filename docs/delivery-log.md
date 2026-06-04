@@ -4,7 +4,7 @@
 
 | 日期 | 议题/范围 | 分支 | PR | 关键 commit | 状态 |
 | --- | --- | --- | --- | --- | --- |
-| 2026-06-05 | 建立持续交付规范 | `feat/delivery-guidelines` | 待创建 | 待提交 | 进行中 |
+| 2026-06-05 | 建立持续交付规范 | `feat/delivery-guidelines` | [创建 PR](https://github.com/yyt-05/Verba-/compare/main...feat/delivery-guidelines?expand=1) | `2d48f5f` | 待创建 PR |
 
 ## 记录要求
 
