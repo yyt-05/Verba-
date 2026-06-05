@@ -1,0 +1,238 @@
+<svg width="1900" height="1420" viewBox="0 0 1900 1420" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="pageBg" x1="0" y1="0" x2="1900" y2="1420" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F8FBFF"/>
+      <stop offset="0.58" stop-color="#EEF5FF"/>
+      <stop offset="1" stop-color="#DFEAFF"/>
+    </linearGradient>
+    <linearGradient id="screenBg" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#182236"/>
+      <stop offset="1" stop-color="#080D18"/>
+    </linearGradient>
+    <linearGradient id="blue" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#1267FF"/>
+      <stop offset="1" stop-color="#0046B8"/>
+    </linearGradient>
+    <filter id="cardShadow" x="-20%" y="-20%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="18" stdDeviation="24" flood-color="#1267FF" flood-opacity="0.10"/>
+      <feDropShadow dx="0" dy="3" stdDeviation="12" flood-color="#10213D" flood-opacity="0.12"/>
+    </filter>
+    <filter id="floatShadow" x="-40%" y="-70%" width="180%" height="240%">
+      <feDropShadow dx="0" dy="8" stdDeviation="14" flood-color="#05070A" flood-opacity="0.58"/>
+      <feDropShadow dx="0" dy="0" stdDeviation="14" flood-color="#1267FF" flood-opacity="0.20"/>
+    </filter>
+    <filter id="yellowGlow" x="-40%" y="-80%" width="180%" height="260%">
+      <feDropShadow dx="0" dy="5" stdDeviation="10" flood-color="#05070A" flood-opacity="0.55"/>
+      <feDropShadow dx="0" dy="0" stdDeviation="18" flood-color="#FFD85A" flood-opacity="0.35"/>
+    </filter>
+    <filter id="textShadow" x="-20%" y="-80%" width="140%" height="260%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#05070A" flood-opacity="0.92"/>
+      <feDropShadow dx="0" dy="0" stdDeviation="10" flood-color="#1267FF" flood-opacity="0.24"/>
+    </filter>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="9" refY="6" orient="auto">
+      <path d="M2 2 L10 6 L2 10" stroke="#1267FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <style>
+      .h1 { font: 900 46px "Microsoft YaHei", "PingFang SC", Arial, sans-serif; fill: #101827; }
+      .h2 { font: 800 22px "Microsoft YaHei", "PingFang SC", Arial, sans-serif; fill: #101827; }
+      .body { font: 500 16px "Microsoft YaHei", "PingFang SC", Arial, sans-serif; fill: #5C6D86; }
+      .step { font: 900 18px "Microsoft YaHei", "PingFang SC", Arial, sans-serif; fill: #1267FF; }
+      .ui { font: 700 14px "Microsoft YaHei", "PingFang SC", Arial, sans-serif; fill: #F7FAFF; }
+      .uiMuted { font: 600 12px "Microsoft YaHei", "PingFang SC", Arial, sans-serif; fill: #9DB1D0; }
+      .en { font: 700 14px Arial, sans-serif; fill: #F7FAFF; }
+      .zh { font: 900 22px "Microsoft YaHei", "PingFang SC", Arial, sans-serif; fill: #BFD8FF; }
+      .old { font: 700 12px "Microsoft YaHei", "PingFang SC", Arial, sans-serif; fill: #8A94A6; }
+      .dashTitle { font: 900 18px "Microsoft YaHei", "PingFang SC", Arial, sans-serif; fill: #101827; }
+      .dashText { font: 600 12px "Microsoft YaHei", "PingFang SC", Arial, sans-serif; fill: #61708A; }
+      .dashNum { font: 900 26px Arial, sans-serif; fill: #1267FF; }
+    </style>
+  </defs>
+
+  <rect width="1900" height="1420" fill="url(#pageBg)"/>
+
+  <text x="72" y="82" class="h1">Verba 修正式悬浮字幕全局步骤图</text>
+  <text x="74" y="118" class="body">核心体验：常驻歌词小框不挡视频；修正发生时自动短暂展开；用户需要回看时滑出最近字幕窗格；控制台承载数据与设置。</text>
+  <rect x="72" y="144" width="98" height="5" rx="2.5" fill="#1267FF"/>
+  <rect x="180" y="144" width="60" height="5" rx="2.5" fill="#FFD85A"/>
+
+  <!-- Step 1 -->
+  <g transform="translate(72 194)" filter="url(#cardShadow)">
+    <rect width="548" height="318" rx="22" fill="#FFFFFF"/>
+    <text x="28" y="44" class="step">Step 01</text>
+    <text x="112" y="44" class="h2">打开看板/视频</text>
+    <text x="28" y="74" class="body">只有一个小悬浮入口，默认不显示控制台。</text>
+    <g transform="translate(28 102)">
+      <rect width="492" height="178" rx="16" fill="url(#screenBg)"/>
+      <rect x="30" y="28" width="160" height="15" rx="6" fill="#EAF3FF" opacity="0.12"/>
+      <rect x="30" y="56" width="280" height="12" rx="5" fill="#EAF3FF" opacity="0.08"/>
+      <rect x="325" y="34" width="112" height="92" rx="14" fill="#EAF3FF" opacity="0.07"/>
+      <g transform="translate(196 130)" filter="url(#floatShadow)">
+        <rect width="136" height="42" rx="21" fill="#FFFFFF" fill-opacity="0.18" stroke="#BFD8FF" stroke-opacity="0.56"/>
+        <circle cx="24" cy="21" r="15" fill="url(#blue)"/>
+        <path d="M20 14 L30 21 L20 28 Z" fill="#F7FAFF"/>
+        <text x="48" y="27" class="ui">Verba</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- Step 2 -->
+  <g transform="translate(730 194)" filter="url(#cardShadow)">
+    <rect width="548" height="318" rx="22" fill="#FFFFFF"/>
+    <text x="28" y="44" class="step">Step 02</text>
+    <text x="112" y="44" class="h2">点击开始，出现歌词小框</text>
+    <text x="28" y="74" class="body">常驻只显示 2 句：上一句淡出，当前句突出。</text>
+    <g transform="translate(28 102)">
+      <rect width="492" height="178" rx="16" fill="url(#screenBg)"/>
+      <g transform="translate(68 74)" filter="url(#floatShadow)">
+        <rect width="356" height="96" rx="12" fill="#05070A" fill-opacity="0.18" stroke="#BFD8FF" stroke-opacity="0.34"/>
+        <text x="178" y="24" text-anchor="middle" class="uiMuted" filter="url(#textShadow)">他们保持健康，没有精神障碍。</text>
+        <text x="178" y="50" text-anchor="middle" class="en" filter="url(#textShadow)">"How can we use them to lower anxiety?"</text>
+        <text x="178" y="78" text-anchor="middle" class="zh" filter="url(#textShadow)">我们如何利用它们来减轻焦虑？</text>
+      </g>
+      <circle cx="218" cy="58" r="5" fill="#12C76A"/>
+      <text x="232" y="63" class="uiMuted">Listening</text>
+    </g>
+  </g>
+
+  <!-- Step 3 -->
+  <g transform="translate(1388 194)" filter="url(#cardShadow)">
+    <rect width="428" height="318" rx="22" fill="#FFFFFF"/>
+    <text x="28" y="44" class="step">Step 03</text>
+    <text x="112" y="44" class="h2">悬停小框</text>
+    <text x="28" y="74" class="body">露出轻控制条，可展开字幕窗格或控制台。</text>
+    <g transform="translate(28 102)">
+      <rect width="372" height="178" rx="16" fill="url(#screenBg)"/>
+      <g transform="translate(34 58)" filter="url(#floatShadow)">
+        <rect width="304" height="82" rx="12" fill="#05070A" fill-opacity="0.18" stroke="#BFD8FF" stroke-opacity="0.34"/>
+        <text x="152" y="30" text-anchor="middle" class="en" filter="url(#textShadow)">"How can we use them?"</text>
+        <text x="152" y="58" text-anchor="middle" class="zh" filter="url(#textShadow)">我们如何利用它们？</text>
+      </g>
+      <g transform="translate(48 142)" filter="url(#floatShadow)">
+        <rect width="276" height="36" rx="18" fill="#FFFFFF" fill-opacity="0.18" stroke="#BFD8FF" stroke-opacity="0.42"/>
+        <text x="18" y="24" class="ui">字幕窗格</text>
+        <text x="102" y="24" class="ui">A-</text>
+        <text x="140" y="24" class="ui">A+</text>
+        <circle cx="196" cy="18" r="12" fill="#1267FF"/>
+        <text x="192" y="23" class="ui">↕</text>
+        <circle cx="238" cy="18" r="12" fill="#1267FF"/>
+        <text x="234" y="23" class="ui">↗</text>
+      </g>
+    </g>
+  </g>
+
+  <path d="M638 353 H708" stroke="#1267FF" stroke-width="3" marker-end="url(#arrow)"/>
+  <path d="M1298 353 H1366" stroke="#1267FF" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <!-- Step 4 auto correction expanded -->
+  <g transform="translate(72 592)" filter="url(#cardShadow)">
+    <rect width="548" height="366" rx="22" fill="#FFFFFF"/>
+    <text x="28" y="44" class="step">Step 04</text>
+    <text x="112" y="44" class="h2">系统自动修正之前的句子</text>
+    <text x="28" y="74" class="body">小框临时展开到 3-4 句，让用户看到上下文和旧译文。</text>
+    <g transform="translate(28 106)">
+      <rect width="492" height="222" rx="16" fill="url(#screenBg)"/>
+      <g transform="translate(58 40)" filter="url(#yellowGlow)">
+        <rect width="376" height="166" rx="14" fill="#05070A" fill-opacity="0.22" stroke="#FFD85A" stroke-opacity="0.56"/>
+        <text x="20" y="34" class="uiMuted">上一句：他们保持健康，没有精神障碍。</text>
+        <text x="20" y="68" class="en">"Downward spiral."</text>
+        <rect x="16" y="82" width="4" height="48" rx="2" fill="#FFD85A"/>
+        <text x="30" y="105" font-family="Microsoft YaHei, PingFang SC, Arial" font-size="25" font-weight="900" fill="#FFD85A">螺旋式下降。 ✦ 已修正</text>
+        <text x="30" y="134" class="old" text-decoration="line-through">原译：向下螺旋。</text>
+        <text x="20" y="154" class="uiMuted">下一句：在深入探讨之前...</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- Step 5 sliding subtitle pane -->
+  <g transform="translate(730 592)" filter="url(#cardShadow)">
+    <rect width="548" height="366" rx="22" fill="#FFFFFF"/>
+    <text x="28" y="44" class="step">Step 05</text>
+    <text x="112" y="44" class="h2">点击 ↕ 打开滑动字幕窗格</text>
+    <text x="28" y="74" class="body">用于回看最近 8-12 条字幕，并清楚看到哪些被修正。</text>
+    <g transform="translate(28 106)">
+      <rect width="492" height="222" rx="16" fill="url(#screenBg)"/>
+      <g transform="translate(64 16)" filter="url(#floatShadow)">
+        <rect width="364" height="206" rx="16" fill="#FFFFFF" fill-opacity="0.15" stroke="#BFD8FF" stroke-opacity="0.44"/>
+        <text x="22" y="34" class="ui">最近字幕</text>
+        <text x="286" y="34" class="uiMuted">12 条</text>
+        <rect x="20" y="48" width="324" height="1" fill="#BFD8FF" opacity="0.22"/>
+
+        <text x="22" y="74" class="uiMuted">"Re wars and natural disasters."</text>
+        <text x="22" y="96" class="ui">战争与自然灾害。</text>
+
+        <text x="22" y="126" class="uiMuted">"Downward spiral."</text>
+        <rect x="18" y="136" width="4" height="32" rx="2" fill="#FFD85A"/>
+        <text x="30" y="152" font-family="Microsoft YaHei, PingFang SC, Arial" font-size="15" font-weight="900" fill="#FFD85A">螺旋式下降。 已修正</text>
+        <text x="30" y="172" class="old" text-decoration="line-through">原译：向下螺旋。</text>
+
+        <text x="22" y="196" class="uiMuted">"Before I dive into what they are..."</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- Step 6 dashboard -->
+  <g transform="translate(1388 592)" filter="url(#cardShadow)">
+    <rect width="428" height="366" rx="22" fill="#FFFFFF"/>
+    <text x="28" y="44" class="step">Step 06</text>
+    <text x="112" y="44" class="h2">点击 ↗ 打开数据控制台</text>
+    <text x="28" y="74" class="body">控制台负责数据、设置、异常，不常驻。</text>
+    <g transform="translate(28 106)">
+      <rect width="372" height="222" rx="16" fill="#F7FAFF" stroke="#D6E5FA"/>
+      <rect width="372" height="44" rx="16" fill="#FFFFFF"/>
+      <text x="18" y="29" class="dashTitle">Verba 控制台</text>
+      <rect x="304" y="10" width="48" height="24" rx="12" fill="#1267FF"/>
+      <text x="315" y="27" class="ui">收起</text>
+
+      <g transform="translate(18 62)">
+        <rect width="104" height="62" rx="10" fill="#FFFFFF" stroke="#DCE8F7"/>
+        <text x="12" y="24" class="dashText">延迟</text>
+        <text x="12" y="50" class="dashNum">2.8</text>
+      </g>
+      <g transform="translate(138 62)">
+        <rect width="104" height="62" rx="10" fill="#FFFFFF" stroke="#DCE8F7"/>
+        <text x="12" y="24" class="dashText">字幕</text>
+        <text x="12" y="50" class="dashNum">37</text>
+      </g>
+      <g transform="translate(258 62)">
+        <rect width="104" height="62" rx="10" fill="#FFFFFF" stroke="#DCE8F7"/>
+        <text x="12" y="24" class="dashText">修正</text>
+        <text x="12" y="50" class="dashNum">5</text>
+      </g>
+      <rect x="18" y="146" width="164" height="34" rx="17" fill="#EAF3FF"/>
+      <circle cx="38" cy="163" r="5" fill="#12C76A"/>
+      <text x="52" y="168" class="dashText">WASAPI 系统音频</text>
+      <rect x="198" y="146" width="74" height="34" rx="17" fill="#EF3B3A"/>
+      <text x="222" y="168" class="ui">停止</text>
+      <rect x="284" y="146" width="74" height="34" rx="17" fill="#FFFFFF" stroke="#DCE8F7"/>
+      <text x="308" y="168" class="dashText">清空</text>
+    </g>
+  </g>
+
+  <path d="M392 512 V570" stroke="#1267FF" stroke-width="3" marker-end="url(#arrow)"/>
+  <path d="M1508 512 V570" stroke="#1267FF" stroke-width="3" marker-end="url(#arrow)"/>
+  <path d="M1508 512 C1508 540 1040 538 1004 570" stroke="#1267FF" stroke-width="3" fill="none" marker-end="url(#arrow)" opacity="0.82"/>
+
+  <!-- Step 7 stop -->
+  <g transform="translate(72 1040)" filter="url(#cardShadow)">
+    <rect width="1816" height="252" rx="22" fill="#FFFFFF"/>
+    <text x="28" y="48" class="step">Step 07</text>
+    <text x="112" y="48" class="h2">停止/收起后回到小入口</text>
+    <text x="28" y="80" class="body">停止后不再上传音频；当前会话字幕可在控制台中保留，常驻层回到最小按钮。</text>
+    <g transform="translate(28 112)">
+      <rect width="520" height="104" rx="16" fill="url(#screenBg)"/>
+      <g transform="translate(206 52)" filter="url(#floatShadow)">
+        <rect width="136" height="42" rx="21" fill="#FFFFFF" fill-opacity="0.18" stroke="#BFD8FF" stroke-opacity="0.56"/>
+        <circle cx="24" cy="21" r="15" fill="url(#blue)"/>
+        <path d="M20 14 L30 21 L20 28 Z" fill="#F7FAFF"/>
+        <text x="48" y="27" class="ui">Verba</text>
+      </g>
+    </g>
+    <g transform="translate(650 116)">
+      <text x="0" y="0" class="dashTitle">这套设计解决的问题</text>
+      <text x="0" y="36" class="body">常驻观看：只显示小歌词框，不挡内容。</text>
+      <text x="0" y="68" class="body">自动修正：临时展开，让用户知道哪句被改了。</text>
+      <text x="500" y="36" class="body">手动回看：滑动窗格展示最近字幕和修正记录。</text>
+      <text x="500" y="68" class="body">深度控制：控制台集中处理数据、设置和异常。</text>
+    </g>
+  </g>
+</svg>
