@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/session_provider.dart';
+import '../theme/verba_theme.dart';
 
 /// WASAPI audio capture toggle + volume meter.
 /// Uses the shared WasapiCapture instance from Riverpod provider.
@@ -69,8 +70,8 @@ class _AudioMeterState extends ConsumerState<AudioMeter> {
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.red.shade800,
-                borderRadius: BorderRadius.circular(4),
+                color: VerbaColors.dangerRed,
+                borderRadius: BorderRadius.circular(VerbaTheme.panelRadius),
               ),
               child: Text(
                 'WASAPI 错误 (code=$_errorCode)',
@@ -85,8 +86,8 @@ class _AudioMeterState extends ConsumerState<AudioMeter> {
               margin: const EdgeInsets.only(bottom: 8),
               decoration: BoxDecoration(
                 color: Colors.black38,
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: Colors.white12),
+                borderRadius: BorderRadius.circular(VerbaTheme.panelRadius),
+                border: Border.all(color: VerbaColors.softBlue.withValues(alpha: 0.18)),
               ),
               child: Align(
                 alignment: Alignment.bottomCenter,
@@ -99,9 +100,13 @@ class _AudioMeterState extends ConsumerState<AudioMeter> {
                     gradient: LinearGradient(
                       begin: Alignment.bottomCenter,
                       end: Alignment.topCenter,
-                      colors: [Color(0xFF00E676), Color(0xFFFFEB3B), Color(0xFFFF1744)],
+                      colors: [
+                        VerbaColors.successGreen,
+                        VerbaColors.accentYellow,
+                        VerbaColors.dangerRed,
+                      ],
                     ),
-                    borderRadius: BorderRadius.all(Radius.circular(4)),
+                    borderRadius: BorderRadius.all(Radius.circular(6)),
                   ),
                 ),
               ),
@@ -110,15 +115,16 @@ class _AudioMeterState extends ConsumerState<AudioMeter> {
           // Button
           AnimatedContainer(
             duration: const Duration(milliseconds: 300),
-            width: 56, height: 56,
+            width: VerbaTheme.controlSize, height: VerbaTheme.controlSize,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: _capturing ? const Color(0xFFE53935) : const Color(0xFF00C853),
+              color: _capturing ? VerbaColors.dangerRed : VerbaColors.successGreen,
               boxShadow: [
                 BoxShadow(
-                  color: (_capturing ? const Color(0xFFE53935) : const Color(0xFF00C853))
+                  color: (_capturing ? VerbaColors.dangerRed : VerbaColors.successGreen)
                       .withValues(alpha: 0.5),
-                  blurRadius: 16, spreadRadius: 2,
+                  blurRadius: VerbaTheme.buttonShadowBlur,
+                  spreadRadius: 1,
                 ),
               ],
             ),
@@ -135,12 +141,15 @@ class _AudioMeterState extends ConsumerState<AudioMeter> {
                     ? '正在捕获系统音频'
                     : '点击测试 WASAPI',
             style: TextStyle(
-              color: _capturing ? Colors.greenAccent : Colors.white54, fontSize: 11),
+              color: _capturing ? VerbaColors.successGreen : VerbaColors.mutedGray,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
           ),
           if (_capturing)
             Text(
               '电平: ${(_level * 100).toStringAsFixed(0)}%',
-              style: const TextStyle(color: Colors.white30, fontSize: 10),
+              style: const TextStyle(color: VerbaColors.mutedGray, fontSize: 10),
             ),
           if (_capturing)
             Padding(
@@ -149,7 +158,7 @@ class _AudioMeterState extends ConsumerState<AudioMeter> {
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(VerbaTheme.panelRadius),
                 ),
                 child: Text(wasapi.diag,
                   style: const TextStyle(color: Colors.white38, fontSize: 9, fontFamily: 'monospace')),

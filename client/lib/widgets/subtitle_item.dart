@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import '../models/subtitle_entry.dart';
+import '../theme/verba_theme.dart';
 
 /// Single subtitle entry: English original (white) + Chinese translation (highlighted).
 ///
-/// On correction: blue background flash animation (1.2s: 0.3s fade-in → 0.6s hold → 0.3s fade-out),
-/// per UI/UX review recommendation (replaces the original 500ms yellow flash).
+/// On correction: yellow accent flash animation (1.2s: 0.3s fade-in → 0.6s hold → 0.3s fade-out).
 class SubtitleItem extends StatefulWidget {
   final SubtitleEntry entry;
   final bool isNewest;
@@ -63,13 +63,13 @@ class _SubtitleItemState extends State<SubtitleItem> with SingleTickerProviderSt
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
             color: entry.isCorrected
-                ? const Color(0xFFE3F2FD).withValues(alpha: 0.15 * _fadeAnim.value)
+                ? VerbaColors.accentYellow.withValues(alpha: 0.16 * _fadeAnim.value)
                 : Colors.transparent,
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(VerbaTheme.panelRadius),
             border: entry.isCorrected
                 ? Border(
                     left: BorderSide(
-                      color: const Color(0xFF42A5F5).withValues(alpha: _fadeAnim.value),
+                      color: VerbaColors.accentYellow.withValues(alpha: _fadeAnim.value),
                       width: 3,
                     ),
                   )
@@ -84,26 +84,31 @@ class _SubtitleItemState extends State<SubtitleItem> with SingleTickerProviderSt
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.9),
                   fontSize: 13,
-                  height: 1.4,
+                  fontWeight: FontWeight.w600,
+                  height: 1.35,
                 ),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 3),
               // Chinese translation
               Row(
                 children: [
                   if (entry.isCorrected)
                     const Padding(
                       padding: EdgeInsets.only(right: 4),
-                      child: Icon(Icons.auto_fix_high, size: 14, color: Color(0xFF42A5F5)),
+                      child: Icon(
+                        Icons.auto_fix_high,
+                        size: 14,
+                        color: VerbaColors.accentYellow,
+                      ),
                     ),
                   Expanded(
                     child: Text(
                       entry.translation,
                       style: const TextStyle(
-                        color: Color(0xFFBBDEFB),
-                        fontSize: 15,
-                        fontWeight: FontWeight.w500,
-                        height: 1.4,
+                        color: VerbaColors.textBlue,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        height: 1.45,
                       ),
                     ),
                   ),
@@ -116,7 +121,7 @@ class _SubtitleItemState extends State<SubtitleItem> with SingleTickerProviderSt
                   child: Text(
                     entry.oldTranslation!,
                     style: TextStyle(
-                      color: Colors.white30,
+                      color: VerbaColors.mutedGray.withValues(alpha: 0.55),
                       fontSize: 12,
                       decoration: TextDecoration.lineThrough,
                     ),
