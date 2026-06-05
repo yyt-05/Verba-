@@ -1,0 +1,23 @@
+# API keys — NEVER commit
+.env
+server/.env
+
+# Flutter
+client/.dart_tool/
+client/build/
+client/.flutter-plugins-dependencies
+client/.flutter-plugins
+
+# Go
+server/verba.exe
+server/*.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+Desktop.ini
