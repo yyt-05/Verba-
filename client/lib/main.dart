@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 import 'pages/home_page.dart';
+import 'theme/verba_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,7 +29,7 @@ class VerbaApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF1A73E8),
+          seedColor: VerbaColors.brandBlue,
           brightness: Brightness.dark,
         ),
         scaffoldBackgroundColor: Colors.transparent,

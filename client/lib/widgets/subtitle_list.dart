@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/session_provider.dart';
+import '../theme/verba_theme.dart';
 import 'subtitle_item.dart';
 
 /// Scrollable bilingual subtitle list with auto-scroll to bottom.
@@ -42,7 +43,7 @@ class _SubtitleListState extends ConsumerState<SubtitleList> {
       return const Center(
         child: Text(
           '点击下方按钮开始监听',
-          style: TextStyle(color: Colors.white54, fontSize: 16),
+          style: TextStyle(color: VerbaColors.mutedGray, fontSize: 16),
         ),
       );
     }
@@ -78,8 +79,8 @@ class _SubtitleListState extends ConsumerState<SubtitleList> {
                   _autoScroll = true;
                   _scrollToBottom();
                 },
-                backgroundColor: Colors.white24,
-                child: const Icon(Icons.arrow_downward, color: Colors.white),
+                backgroundColor: VerbaColors.brandBlue,
+                child: const Icon(Icons.arrow_downward, color: VerbaColors.inkWhite),
               ),
             ),
         ],

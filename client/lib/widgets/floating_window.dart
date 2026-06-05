@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/session_provider.dart';
+import '../theme/verba_theme.dart';
 import 'subtitle_list.dart';
 
 /// The expanded subtitle area shown when session is active.
@@ -26,11 +27,12 @@ class ExpandedSubtitleArea extends ConsumerWidget {
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 16),
         decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.75),
-          borderRadius: BorderRadius.circular(12),
+          color: VerbaColors.glassBlack.withValues(alpha: 0.88),
+          borderRadius: BorderRadius.circular(VerbaTheme.panelRadius),
+          border: Border.all(color: VerbaColors.softBlue.withValues(alpha: 0.12)),
         ),
         child: const ClipRRect(
-          borderRadius: BorderRadius.all(Radius.circular(12)),
+          borderRadius: BorderRadius.all(Radius.circular(VerbaTheme.panelRadius)),
           child: SubtitleList(),
         ),
       ),
@@ -67,14 +69,14 @@ class FloatingControlButton extends ConsumerWidget {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: isActive
-              ? const Color(0xFFE53935) // Red when active (stop action)
-              : const Color(0xFF1A73E8), // Blue when idle (start action)
+              ? VerbaColors.dangerRed
+              : VerbaColors.brandBlue,
           boxShadow: [
             BoxShadow(
-              color: (isActive ? const Color(0xFFE53935) : const Color(0xFF1A73E8))
+              color: (isActive ? VerbaColors.dangerRed : VerbaColors.brandBlue)
                   .withValues(alpha: 0.4),
-              blurRadius: 12,
-              spreadRadius: 2,
+              blurRadius: VerbaTheme.buttonShadowBlur,
+              spreadRadius: 1,
             ),
           ],
         ),
