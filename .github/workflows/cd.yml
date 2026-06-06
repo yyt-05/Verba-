@@ -1,0 +1,57 @@
+name: CD
+
+on:
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  release-server:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.25"
+      - name: cross build
+        run: |
+          GOOS=linux   GOARCH=amd64 go build -o verba-linux-amd64   ./cmd/verba
+          GOOS=windows GOARCH=amd64 go build -o verba-windows-amd64.exe ./cmd/verba
+          GOOS=darwin  GOARCH=amd64 go build -o verba-darwin-amd64  ./cmd/verba
+      - name: create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            server/verba-linux-amd64
+            server/verba-windows-amd64.exe
+            server/verba-darwin-amd64
+          tag_name: release-${{ github.run_id }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy-web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v5
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.38.x"
+          channel: stable
+      - name: flutter pub get
+        run: flutter pub get
+      - name: flutter build web
+        run: flutter build web --base-href /Verba-/
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: client/build/web
+      - uses: actions/deploy-pages@v4
