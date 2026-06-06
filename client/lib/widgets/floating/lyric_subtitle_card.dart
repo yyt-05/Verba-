@@ -19,10 +19,7 @@ class LyricSubtitleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final current = subtitles.isNotEmpty ? subtitles.last : null;
-    final previous = subtitles.length > 1
-        ? subtitles[subtitles.length - 2]
-        : null;
+    final recent = _recentParagraph(subtitles);
     final corrected = _latestCorrected(subtitles);
     final showCorrection = correctionPreview && corrected != null;
 
@@ -30,38 +27,47 @@ class LyricSubtitleCard extends StatelessWidget {
       builder: (context, constraints) {
         final maxWidth = constraints.hasBoundedWidth
             ? constraints.maxWidth - 24
-            : 520.0;
-        final targetWidth = (showCorrection ? 480.0 : 420.0) * fontScale;
-        final width = targetWidth
-            .clamp(320.0, maxWidth.clamp(320.0, 560.0))
-            .toDouble();
+            : 720.0;
+        final width = maxWidth.clamp(340.0, 920.0).toDouble();
 
         return GestureDetector(
           onTap: onTap,
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 220),
+            duration: const Duration(milliseconds: 180),
             width: width,
             child: GlassSurface(
-              radius: 12,
-              opacity: showCorrection ? 0.58 : 0.48,
-              borderColor: VerbaColors.inkWhite,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              radius: 10,
+              opacity: showCorrection ? 0.42 : 0.34,
+              borderColor: VerbaColors.textBlue,
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
               child: showCorrection
                   ? _CorrectionPreview(
                       entry: corrected,
                       subtitles: subtitles,
                       fontScale: fontScale,
                     )
-                  : _LyricPair(
-                      previous: previous,
-                      current: current,
-                      fontScale: fontScale,
-                    ),
+                  : _ParagraphSubtitle(entries: recent, fontScale: fontScale),
             ),
           ),
         );
       },
     );
+  }
+
+  List<SubtitleEntry> _recentParagraph(List<SubtitleEntry> entries) {
+    if (entries.isEmpty) return const [];
+    final selected = <SubtitleEntry>[];
+    var originalChars = 0;
+    var translationChars = 0;
+
+    for (var i = entries.length - 1; i >= 0 && selected.length < 4; i--) {
+      final entry = entries[i];
+      originalChars += entry.original.length;
+      translationChars += entry.translation.length;
+      selected.insert(0, entry);
+      if (originalChars > 260 || translationChars > 180) break;
+    }
+    return selected;
   }
 
   SubtitleEntry? _latestCorrected(List<SubtitleEntry> entries) {
@@ -72,20 +78,15 @@ class LyricSubtitleCard extends StatelessWidget {
   }
 }
 
-class _LyricPair extends StatelessWidget {
-  final SubtitleEntry? previous;
-  final SubtitleEntry? current;
+class _ParagraphSubtitle extends StatelessWidget {
+  final List<SubtitleEntry> entries;
   final double fontScale;
 
-  const _LyricPair({
-    required this.previous,
-    required this.current,
-    required this.fontScale,
-  });
+  const _ParagraphSubtitle({required this.entries, required this.fontScale});
 
   @override
   Widget build(BuildContext context) {
-    if (current == null) {
+    if (entries.isEmpty) {
       return const Text(
         '正在等待英文音频...',
         textAlign: TextAlign.center,
@@ -93,51 +94,44 @@ class _LyricPair extends StatelessWidget {
           color: VerbaColors.mutedGray,
           fontSize: 14,
           fontWeight: FontWeight.w700,
+          decoration: TextDecoration.none,
         ),
       );
     }
 
-    final currentAlpha = current?.status == SubtitleStatus.draft ? 0.58 : 1.0;
-    final sourceAlpha = current?.status == SubtitleStatus.draft ? 0.48 : 0.76;
+    final current = entries.last;
+    final isDraft = current.status == SubtitleStatus.draft;
+    final sourceAlpha = isDraft ? 0.42 : 0.68;
+    final original = entries.map((e) => e.original).join(' ');
 
     return Column(
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (previous != null)
-          Text(
-            previous!.translation,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: _shadowStyle(
-              color: VerbaColors.inkWhite.withValues(alpha: 0.62),
-              size: 13 * fontScale,
-              weight: FontWeight.w600,
-            ),
-          ),
-        if (previous != null) const SizedBox(height: 4),
         Text(
-          current!.original,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-          style: _shadowStyle(
+          original,
+          textAlign: TextAlign.left,
+          softWrap: true,
+          style: _subtitleStyle(
             color: VerbaColors.inkWhite.withValues(alpha: sourceAlpha),
-            size: 15 * fontScale,
+            size: 13 * fontScale,
             weight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: 4),
-        Text(
-          current!.translation,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-          style: _shadowStyle(
-            color: VerbaColors.inkWhite.withValues(alpha: currentAlpha),
-            size: 23 * fontScale,
-            weight: FontWeight.w900,
+        const SizedBox(height: 8),
+        RichText(
+          text: TextSpan(
+            children: [
+              for (final entry in entries)
+                ..._translationSpans(
+                  entry,
+                  size: 21 * fontScale,
+                  weight: FontWeight.w800,
+                  isDraft: isDraft,
+                ),
+            ],
           ),
+          softWrap: true,
         ),
       ],
     );
@@ -168,139 +162,110 @@ class _CorrectionPreview extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (previous != null)
-          Text(
-            '上一句：$previous',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: VerbaColors.mutedGray,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+          Text('上一句：$previous', softWrap: true, style: _metaStyle()),
         const SizedBox(height: 8),
         Text(
           entry.original,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: _shadowStyle(
-            color: VerbaColors.inkWhite,
+          softWrap: true,
+          style: _subtitleStyle(
+            color: VerbaColors.inkWhite.withValues(alpha: 0.72),
             size: 13 * fontScale,
-            weight: FontWeight.w700,
+            weight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: 6),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 3,
-              height: 48,
-              margin: const EdgeInsets.only(top: 3, right: 10),
-              decoration: BoxDecoration(
-                color: VerbaColors.accentYellow,
-                borderRadius: BorderRadius.circular(2),
-              ),
+        RichText(
+          text: TextSpan(
+            children: _translationSpans(
+              entry,
+              size: 21 * fontScale,
+              weight: FontWeight.w800,
+              isDraft: false,
             ),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Wrap(
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 8,
-                    runSpacing: 4,
-                    children: [
-                      Text(
-                        entry.translation,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: _shadowStyle(
-                          color: VerbaColors.inkWhite,
-                          size: 22 * fontScale,
-                          weight: FontWeight.w900,
-                        ),
-                      ),
-                      const _CorrectionBadge(),
-                    ],
-                  ),
-                  if (entry.oldTranslation != null)
-                    Text(
-                      '原译：${entry.oldTranslation}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: VerbaColors.mutedGray.withValues(alpha: 0.74),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ],
+          ),
+          softWrap: true,
         ),
         if (next != null) ...[
           const SizedBox(height: 8),
-          Text(
-            '下一句：$next',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: VerbaColors.mutedGray,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+          Text('下一句：$next', softWrap: true, style: _metaStyle()),
         ],
       ],
     );
   }
 }
 
-TextStyle _shadowStyle({
+List<TextSpan> _translationSpans(
+  SubtitleEntry entry, {
+  required double size,
+  required FontWeight weight,
+  required bool isDraft,
+}) {
+  final oldText = entry.oldTranslation?.trim();
+  if (entry.isCorrected && oldText != null && oldText.isNotEmpty) {
+    return [
+      TextSpan(
+        text: oldText,
+        style: _subtitleStyle(
+          color: VerbaColors.mutedGray.withValues(alpha: 0.72),
+          size: size,
+          weight: weight,
+          decoration: TextDecoration.lineThrough,
+        ),
+      ),
+      TextSpan(
+        text: ' ${entry.translation}',
+        style: _subtitleStyle(
+          color: VerbaColors.accentYellow,
+          size: size,
+          weight: FontWeight.w900,
+        ),
+      ),
+    ];
+  }
+
+  return [
+    TextSpan(
+      text: entry.translation,
+      style: _subtitleStyle(
+        color: VerbaColors.inkWhite.withValues(alpha: isDraft ? 0.62 : 1.0),
+        size: size,
+        weight: weight,
+      ),
+    ),
+  ];
+}
+
+TextStyle _subtitleStyle({
   required Color color,
   required double size,
   required FontWeight weight,
+  TextDecoration decoration = TextDecoration.none,
 }) {
   return TextStyle(
     color: color,
     fontSize: size,
     fontWeight: weight,
-    height: 1.25,
+    height: 1.28,
+    decoration: decoration,
+    decorationColor: color.withValues(alpha: 0.82),
+    decorationThickness: 1.4,
     shadows: [
       Shadow(
-        color: Colors.black.withValues(alpha: 0.9),
-        blurRadius: 8,
+        color: Colors.black.withValues(alpha: 0.68),
+        blurRadius: 5,
         offset: const Offset(0, 2),
       ),
-      Shadow(color: Colors.black.withValues(alpha: 0.58), blurRadius: 14),
+      Shadow(color: Colors.black.withValues(alpha: 0.28), blurRadius: 10),
     ],
   );
 }
 
-class _CorrectionBadge extends StatelessWidget {
-  const _CorrectionBadge();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-      decoration: BoxDecoration(
-        color: VerbaColors.accentYellow.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: VerbaColors.accentYellow.withValues(alpha: 0.34),
-        ),
-      ),
-      child: const Text(
-        '已修正',
-        style: TextStyle(
-          color: VerbaColors.accentYellow,
-          fontSize: 11,
-          fontWeight: FontWeight.w900,
-        ),
-      ),
-    );
-  }
+TextStyle _metaStyle() {
+  return TextStyle(
+    color: VerbaColors.mutedGray.withValues(alpha: 0.82),
+    fontSize: 12,
+    fontWeight: FontWeight.w700,
+    height: 1.25,
+    decoration: TextDecoration.none,
+  );
 }

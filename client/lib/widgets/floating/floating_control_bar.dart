@@ -34,7 +34,11 @@ class FloatingControlBar extends StatelessWidget {
           const SizedBox(width: 8),
           Text(
             '$subtitleCount 条',
-            style: const TextStyle(color: VerbaColors.inkWhite, fontSize: 12, fontWeight: FontWeight.w800),
+            style: const TextStyle(
+              color: VerbaColors.inkWhite,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
           ),
           const SizedBox(width: 10),
           _IconButton(name: 'verba-font-decrease', onTap: onFontDown),

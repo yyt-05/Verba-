@@ -28,8 +28,8 @@ class SlidingSubtitlePane extends StatelessWidget {
         borderColor: VerbaColors.inkWhite,
         padding: EdgeInsets.zero,
         child: SizedBox(
-          width: 390,
-          height: 286,
+          width: 430,
+          height: 330,
           child: Column(
             children: [
               Padding(
@@ -42,6 +42,7 @@ class SlidingSubtitlePane extends StatelessWidget {
                         color: VerbaColors.inkWhite,
                         fontSize: 16,
                         fontWeight: FontWeight.w900,
+                        decoration: TextDecoration.none,
                       ),
                     ),
                     const Spacer(),
@@ -51,6 +52,7 @@ class SlidingSubtitlePane extends StatelessWidget {
                         color: VerbaColors.mutedGray,
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
+                        decoration: TextDecoration.none,
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -73,6 +75,7 @@ class SlidingSubtitlePane extends StatelessWidget {
                           style: TextStyle(
                             color: VerbaColors.mutedGray,
                             fontWeight: FontWeight.w700,
+                            decoration: TextDecoration.none,
                           ),
                         ),
                       )
@@ -102,16 +105,16 @@ class _SubtitleRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.fromLTRB(10, 6, 8, 7),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.fromLTRB(10, 7, 8, 8),
       decoration: BoxDecoration(
         color: entry.isCorrected
-            ? VerbaColors.accentYellow.withValues(alpha: 0.06)
+            ? VerbaColors.textBlue.withValues(alpha: 0.06)
             : Colors.transparent,
         borderRadius: BorderRadius.circular(8),
         border: entry.isCorrected
             ? const Border(
-                left: BorderSide(color: VerbaColors.accentYellow, width: 3),
+                left: BorderSide(color: VerbaColors.textBlue, width: 2),
               )
             : null,
       ),
@@ -120,70 +123,67 @@ class _SubtitleRow extends StatelessWidget {
         children: [
           Text(
             entry.original,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
+            softWrap: true,
             style: TextStyle(
               color: VerbaColors.inkWhite.withValues(alpha: 0.58),
               fontSize: 12,
               fontWeight: FontWeight.w600,
+              height: 1.25,
+              decoration: TextDecoration.none,
             ),
           ),
-          const SizedBox(height: 2),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Text(
-                  entry.translation,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: VerbaColors.inkWhite,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-              if (entry.isCorrected) const _CorrectionBadge(),
-            ],
+          const SizedBox(height: 4),
+          RichText(
+            text: TextSpan(children: _translationSpans(entry)),
+            softWrap: true,
           ),
-          if (entry.isCorrected && entry.oldTranslation != null)
-            Text(
-              '原译：${entry.oldTranslation}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: VerbaColors.mutedGray.withValues(alpha: 0.66),
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
         ],
       ),
     );
   }
 }
 
-class _CorrectionBadge extends StatelessWidget {
-  const _CorrectionBadge();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(left: 8, top: 2),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: VerbaColors.accentYellow.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: const Text(
-        '修正',
-        style: TextStyle(
-          color: VerbaColors.accentYellow,
-          fontSize: 10,
-          fontWeight: FontWeight.w900,
+List<TextSpan> _translationSpans(SubtitleEntry entry) {
+  final oldText = entry.oldTranslation?.trim();
+  if (entry.isCorrected && oldText != null && oldText.isNotEmpty) {
+    return [
+      TextSpan(
+        text: oldText,
+        style: _translationStyle(
+          color: VerbaColors.mutedGray.withValues(alpha: 0.72),
+          decoration: TextDecoration.lineThrough,
         ),
       ),
-    );
+      TextSpan(
+        text: ' ${entry.translation}',
+        style: _translationStyle(
+          color: VerbaColors.accentYellow,
+          weight: FontWeight.w900,
+        ),
+      ),
+    ];
   }
+
+  return [
+    TextSpan(
+      text: entry.translation,
+      style: _translationStyle(color: VerbaColors.inkWhite),
+    ),
+  ];
+}
+
+TextStyle _translationStyle({
+  required Color color,
+  FontWeight weight = FontWeight.w800,
+  TextDecoration decoration = TextDecoration.none,
+}) {
+  return TextStyle(
+    color: color,
+    fontSize: 15,
+    fontWeight: weight,
+    height: 1.25,
+    decoration: decoration,
+    decorationColor: color.withValues(alpha: 0.82),
+    decorationThickness: 1.3,
+  );
 }

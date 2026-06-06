@@ -10,8 +10,9 @@ void main() async {
   // Configure frameless, semi-transparent, always-on-top floating window
   await windowManager.ensureInitialized();
   await windowManager.setAsFrameless();
+  await windowManager.setResizable(true);
   await windowManager.setMinimumSize(const Size(360, 220));
-  await windowManager.setSize(const Size(560, 420));
+  await windowManager.setSize(const Size(720, 360));
   await windowManager.setAlwaysOnTop(true);
   await windowManager.setBackgroundColor(Colors.transparent);
   await windowManager.center();

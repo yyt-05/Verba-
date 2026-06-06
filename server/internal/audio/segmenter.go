@@ -7,9 +7,9 @@ import (
 )
 
 const (
-	defaultVoiceThreshold = 80
+	defaultVoiceThreshold = 10
 	defaultSilenceMs      = 700
-	defaultMinVoiceMs     = 800
+	defaultMinVoiceMs     = 300
 	defaultMaxSegmentMs   = 2000
 )
 
@@ -56,7 +56,7 @@ func (s *Segmenter) AddPCM(chunk []byte) ([]byte, bool) {
 		durationMs = 1
 	}
 
-	voiced := pcmRMS(chunk) >= float64(s.voiceThreshold)
+	voiced := PCMRMS(chunk) >= float64(s.voiceThreshold)
 	if voiced {
 		s.speaking = true
 		s.silentMs = 0
@@ -98,7 +98,7 @@ func (s *Segmenter) resetLocked() {
 	s.voicedMs = 0
 }
 
-func pcmRMS(pcm []byte) float64 {
+func PCMRMS(pcm []byte) float64 {
 	samples := len(pcm) / 2
 	if samples == 0 {
 		return 0

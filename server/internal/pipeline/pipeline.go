@@ -91,8 +91,9 @@ func (p *Pipeline) HandleUploadAudio(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	log.Printf("[audio] received session=%s bytes=%d dur=%dms",
-		sessionID, len(body), time.Since(start).Milliseconds())
+	rms := audio.PCMRMS(body)
+	log.Printf("[audio] received session=%s bytes=%d rms=%.1f dur=%dms",
+		sessionID, len(body), rms, time.Since(start).Milliseconds())
 
 	segment, ready := p.segmenterFor(sessionID).AddPCM(body)
 	if !ready {
