@@ -38,6 +38,9 @@ jobs:
 
   deploy-web:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     defaults:
       run:
         working-directory: client
@@ -51,7 +54,9 @@ jobs:
         run: flutter pub get
       - name: flutter build web
         run: flutter build web --base-href /Verba-/
+      - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:
           path: client/build/web
-      - uses: actions/deploy-pages@v4
+      - id: deployment
+        uses: actions/deploy-pages@v4
