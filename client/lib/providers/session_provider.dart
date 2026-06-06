@@ -78,20 +78,30 @@ class SessionNotifier extends StateNotifier<SessionState> {
     if (data == null) return;
     final type = data['type'] as String?;
 
-    if (type == 'subtitle.final') {
+    if (type == 'subtitle.final' ||
+        type == 'translation.final' ||
+        type == 'translation.draft') {
+      final status = type == 'translation.draft'
+          ? SubtitleStatus.draft
+          : subtitleStatusFromJson(data['status'] as String?);
       final entry = SubtitleEntry(
         segmentId: (data['segmentId'] as int?) ?? 0,
-        original: (data['original'] as String?) ?? '',
-        translation: (data['translation'] as String?) ?? '',
+        original: cleanSubtitleText((data['original'] as String?) ?? ''),
+        translation: cleanSubtitleText((data['translation'] as String?) ?? ''),
         revision: (data['revision'] as int?) ?? 1,
         createdAt: DateTime.now(),
+        status: status,
+        isFinal: (data['isFinal'] as bool?) ?? status != SubtitleStatus.draft,
+        eventSeq: data['eventSeq'] as int? ?? data['id'] as int?,
+        segmentSeq: data['segmentSeq'] as int?,
       );
-      subtitleList.addSubtitle(entry);
+      subtitleList.upsertSubtitle(entry);
     } else if (type == 'subtitle.corrected') {
       final segId = (data['segmentId'] as int?) ?? 0;
-      final newText = (data['newText'] as String?) ?? '';
+      final newText = cleanSubtitleText((data['newText'] as String?) ?? '');
       final rev = (data['revision'] as int?) ?? 1;
-      subtitleList.applyCorrection(segId, newText, rev);
+      final oldText = cleanSubtitleText((data['oldText'] as String?) ?? '');
+      subtitleList.applyCorrection(segId, newText, rev, oldText: oldText);
     }
   }
 
@@ -147,12 +157,16 @@ Map<String, dynamic>? parseSubtitleEventData(String rawData) {
     final nested = event['data'];
 
     if (nested is Map<String, dynamic>) {
-      return {...event, ...nested, if (type != null) 'type': type};
+      final merged = {...event, ...nested};
+      if (type != null) merged['type'] = type;
+      return merged;
     }
 
     if (nested is String) {
       final decoded = jsonDecode(nested) as Map<String, dynamic>;
-      return {...event, ...decoded, if (type != null) 'type': type};
+      final merged = {...event, ...decoded};
+      if (type != null) merged['type'] = type;
+      return merged;
     }
 
     return event;
@@ -161,24 +175,86 @@ Map<String, dynamic>? parseSubtitleEventData(String rawData) {
   }
 }
 
+String cleanSubtitleText(String value) {
+  final trimmed = value.trim();
+  if (trimmed.isEmpty) return '';
+
+  try {
+    final decoded = jsonDecode(trimmed);
+    if (decoded is Map<String, dynamic>) {
+      for (final key in const ['text', 'original', 'translation', 'newText']) {
+        final nested = decoded[key];
+        if (nested is String && nested.trim().isNotEmpty) {
+          return nested.trim();
+        }
+      }
+    }
+  } catch (_) {}
+
+  return trimmed;
+}
+
 class SubtitleListNotifier extends StateNotifier<List<SubtitleEntry>> {
   SubtitleListNotifier() : super([]);
 
   void addSubtitle(SubtitleEntry entry) {
+    upsertSubtitle(entry);
+  }
+
+  void upsertSubtitle(SubtitleEntry entry) {
+    final index = state.indexWhere((e) => e.segmentId == entry.segmentId);
+    if (index >= 0) {
+      final current = state[index];
+      if (!_shouldApply(current, entry)) return;
+
+      final next = [...state];
+      next[index] = current.copyWith(
+        original: entry.original.isNotEmpty ? entry.original : current.original,
+        translation: entry.translation.isNotEmpty
+            ? entry.translation
+            : current.translation,
+        revision: entry.revision,
+        status: entry.status,
+        isFinal: entry.isFinal,
+        eventSeq: entry.eventSeq,
+        segmentSeq: entry.segmentSeq,
+      );
+      state = next;
+      return;
+    }
+
     state = [...state, entry];
     if (state.length > 200) {
       state = state.sublist(state.length - 200);
     }
   }
 
-  void applyCorrection(int segmentId, String newTranslation, int revision) {
+  bool _shouldApply(SubtitleEntry current, SubtitleEntry incoming) {
+    if (incoming.revision > current.revision) return true;
+    if (incoming.revision < current.revision) return false;
+    if ((incoming.eventSeq ?? -1) > (current.eventSeq ?? -1)) return true;
+    if (current.status == SubtitleStatus.draft &&
+        incoming.status != SubtitleStatus.draft) {
+      return true;
+    }
+    return false;
+  }
+
+  void applyCorrection(
+    int segmentId,
+    String newTranslation,
+    int revision, {
+    String? oldText,
+  }) {
     state = state.map((e) {
       if (e.segmentId == segmentId && revision > e.revision) {
         return e.copyWith(
           translation: newTranslation,
           revision: revision,
+          status: SubtitleStatus.corrected,
+          isFinal: true,
           isCorrected: true,
-          oldTranslation: e.translation,
+          oldTranslation: oldText?.isNotEmpty == true ? oldText : e.translation,
         );
       }
       return e;

@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:verba_app/models/subtitle_entry.dart';
 import 'package:verba_app/providers/session_provider.dart';
 
 void main() {
@@ -58,6 +59,70 @@ void main() {
 
     test('returns null for malformed json', () {
       expect(parseSubtitleEventData('{bad json'), isNull);
+    });
+  });
+
+  group('cleanSubtitleText', () {
+    test('unwraps common text payloads before display', () {
+      expect(cleanSubtitleText('{"text":"Hello world"}'), 'Hello world');
+      expect(cleanSubtitleText('{"translation":"你好"}'), '你好');
+    });
+
+    test('keeps normal subtitle text unchanged', () {
+      expect(cleanSubtitleText('Hello world'), 'Hello world');
+    });
+  });
+
+  group('SubtitleListNotifier revisions', () {
+    test('upserts draft and final for the same segment', () {
+      final notifier = SubtitleListNotifier();
+
+      notifier.upsertSubtitle(
+        SubtitleEntry(
+          segmentId: 1,
+          original: 'The model',
+          translation: '这个模型',
+          revision: 1,
+          createdAt: DateTime.now(),
+          status: SubtitleStatus.draft,
+          isFinal: false,
+          eventSeq: 10,
+        ),
+      );
+      notifier.upsertSubtitle(
+        SubtitleEntry(
+          segmentId: 1,
+          original: 'The model works.',
+          translation: '这个模型有效。',
+          revision: 1,
+          createdAt: DateTime.now(),
+          status: SubtitleStatus.finalText,
+          isFinal: true,
+          eventSeq: 11,
+        ),
+      );
+
+      expect(notifier.state.length, 1);
+      expect(notifier.state.single.status, SubtitleStatus.finalText);
+      expect(notifier.state.single.translation, '这个模型有效。');
+    });
+
+    test('ignores stale correction revisions', () {
+      final notifier = SubtitleListNotifier();
+
+      notifier.upsertSubtitle(
+        SubtitleEntry(
+          segmentId: 1,
+          original: 'The model works.',
+          translation: '这个模型有效。',
+          revision: 2,
+          createdAt: DateTime.now(),
+        ),
+      );
+      notifier.applyCorrection(1, '过期译文', 1);
+
+      expect(notifier.state.single.translation, '这个模型有效。');
+      expect(notifier.state.single.revision, 2);
     });
   });
 }

@@ -16,7 +16,9 @@ class SlidingSubtitlePane extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final recent = subtitles.length > 12 ? subtitles.sublist(subtitles.length - 12) : subtitles;
+    final recent = subtitles.length > 12
+        ? subtitles.sublist(subtitles.length - 12)
+        : subtitles;
 
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 220),
@@ -36,17 +38,28 @@ class SlidingSubtitlePane extends StatelessWidget {
                   children: [
                     const Text(
                       '最近字幕',
-                      style: TextStyle(color: VerbaColors.inkWhite, fontSize: 16, fontWeight: FontWeight.w900),
+                      style: TextStyle(
+                        color: VerbaColors.inkWhite,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                     const Spacer(),
                     Text(
                       '${recent.length} 条',
-                      style: const TextStyle(color: VerbaColors.mutedGray, fontSize: 12, fontWeight: FontWeight.w700),
+                      style: const TextStyle(
+                        color: VerbaColors.mutedGray,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                     const SizedBox(width: 8),
                     GestureDetector(
                       onTap: onCollapse,
-                      child: const FloatingIcon(name: 'verba-collapse', size: 28),
+                      child: const FloatingIcon(
+                        name: 'verba-collapse',
+                        size: 28,
+                      ),
                     ),
                   ],
                 ),
@@ -57,13 +70,20 @@ class SlidingSubtitlePane extends StatelessWidget {
                     ? const Center(
                         child: Text(
                           '暂无字幕',
-                          style: TextStyle(color: VerbaColors.mutedGray, fontWeight: FontWeight.w700),
+                          style: TextStyle(
+                            color: VerbaColors.mutedGray,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       )
                     : ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
                         itemCount: recent.length,
-                        itemBuilder: (context, index) => _SubtitleRow(entry: recent[index]),
+                        itemBuilder: (context, index) =>
+                            _SubtitleRow(entry: recent[index]),
                       ),
               ),
             ],
@@ -90,14 +110,16 @@ class _SubtitleRow extends StatelessWidget {
             : Colors.transparent,
         borderRadius: BorderRadius.circular(8),
         border: entry.isCorrected
-            ? const Border(left: BorderSide(color: VerbaColors.accentYellow, width: 3))
+            ? const Border(
+                left: BorderSide(color: VerbaColors.accentYellow, width: 3),
+              )
             : null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '"${entry.original}"',
+            entry.original,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(

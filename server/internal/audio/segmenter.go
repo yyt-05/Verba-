@@ -7,10 +7,10 @@ import (
 )
 
 const (
-	defaultVoiceThreshold = 500
+	defaultVoiceThreshold = 80
 	defaultSilenceMs      = 700
 	defaultMinVoiceMs     = 800
-	defaultMaxSegmentMs   = 10000
+	defaultMaxSegmentMs   = 2000
 )
 
 // Segmenter buffers PCM16 mono chunks and returns a segment when speech ends.

@@ -10,13 +10,6 @@ import 'package:verba_app/providers/session_provider.dart';
 /// 不发起真实网络请求，使用 MockClient 拦截。
 void main() {
   group('ApiClient 集成测试', () {
-    late ApiClient client;
-    late MockClient mockClient;
-
-    setUp(() {
-      client = ApiClient(baseUrl: 'http://test.local');
-    });
-
     test('createSession 返回 session_id', () async {
       final mock = MockClient((request) async {
         expect(request.method, 'POST');
