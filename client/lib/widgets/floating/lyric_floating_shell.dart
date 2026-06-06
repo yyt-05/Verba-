@@ -1,7 +1,9 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:window_manager/window_manager.dart';
 import '../../models/subtitle_entry.dart';
 import '../../providers/session_provider.dart';
 import 'data_console_panel.dart';
@@ -53,40 +55,61 @@ class _LyricFloatingShellState extends ConsumerState<LyricFloatingShell> {
                     if (_panel == FloatingPanel.subtitles)
                       SlidingSubtitlePane(
                         subtitles: subtitles,
-                        onCollapse: () => setState(() => _panel = FloatingPanel.lyric),
+                        onCollapse: () =>
+                            setState(() => _panel = FloatingPanel.lyric),
                       )
                     else if (_panel == FloatingPanel.console)
                       DataConsolePanel(
                         state: state,
                         subtitles: subtitles,
-                        onCollapse: () => setState(() => _panel = FloatingPanel.lyric),
+                        onCollapse: () =>
+                            setState(() => _panel = FloatingPanel.lyric),
                         onStop: _stopListening,
-                        onClear: () => ref.read(subtitleListProvider.notifier).clear(),
+                        onClear: () =>
+                            ref.read(subtitleListProvider.notifier).clear(),
                       )
                     else
-                      LyricSubtitleCard(
-                        subtitles: subtitles,
-                        correctionPreview: _correctionPreview,
-                        fontScale: _fontScale,
-                        onTap: () => setState(() => _panel = FloatingPanel.subtitles),
+                      MouseRegion(
+                        cursor: SystemMouseCursors.move,
+                        child: GestureDetector(
+                          onPanStart: (_) => windowManager.startDragging(),
+                          child: Listener(
+                            onPointerSignal: (event) {
+                              if (event is PointerScrollEvent) {
+                                _changeFontScale(
+                                  event.scrollDelta.dy < 0 ? 0.06 : -0.06,
+                                );
+                              }
+                            },
+                            child: LyricSubtitleCard(
+                              subtitles: subtitles,
+                              correctionPreview: _correctionPreview,
+                              fontScale: _fontScale,
+                              onTap: () => setState(
+                                () => _panel = FloatingPanel.subtitles,
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
                     AnimatedOpacity(
                       duration: const Duration(milliseconds: 160),
-                      opacity: _hovering || _panel != FloatingPanel.lyric ? 1 : 0,
+                      opacity: _hovering || _panel != FloatingPanel.lyric
+                          ? 1
+                          : 0,
                       child: Padding(
                         padding: const EdgeInsets.only(top: 10),
                         child: IgnorePointer(
                           ignoring: !_hovering && _panel == FloatingPanel.lyric,
                           child: FloatingControlBar(
                             subtitleCount: subtitles.length,
-                            onOpenSubtitles: () => setState(() => _panel = FloatingPanel.subtitles),
-                            onOpenConsole: () => setState(() => _panel = FloatingPanel.console),
-                            onFontDown: () => setState(
-                              () => _fontScale = (_fontScale - 0.08).clamp(0.86, 1.22).toDouble(),
+                            onOpenSubtitles: () => setState(
+                              () => _panel = FloatingPanel.subtitles,
                             ),
-                            onFontUp: () => setState(
-                              () => _fontScale = (_fontScale + 0.08).clamp(0.86, 1.22).toDouble(),
-                            ),
+                            onOpenConsole: () =>
+                                setState(() => _panel = FloatingPanel.console),
+                            onFontDown: () => _changeFontScale(-0.1),
+                            onFontUp: () => _changeFontScale(0.1),
                             onStop: _stopListening,
                           ),
                         ),
@@ -95,7 +118,10 @@ class _LyricFloatingShellState extends ConsumerState<LyricFloatingShell> {
                   ],
                 ),
               )
-            : MiniFloatingPill(onStart: () => ref.read(sessionProvider.notifier).startListening()),
+            : MiniFloatingPill(
+                onStart: () =>
+                    ref.read(sessionProvider.notifier).startListening(),
+              ),
       ),
     );
   }
@@ -113,6 +139,12 @@ class _LyricFloatingShellState extends ConsumerState<LyricFloatingShell> {
       _correctionPreview = false;
     });
     ref.read(sessionProvider.notifier).stopListening();
+  }
+
+  void _changeFontScale(double delta) {
+    setState(() {
+      _fontScale = (_fontScale + delta).clamp(0.7, 1.65).toDouble();
+    });
   }
 
   void _syncCorrectionPreview(List<SubtitleEntry> subtitles) {

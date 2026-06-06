@@ -118,7 +118,8 @@ func (p *Pipeline) HandleUploadAudio(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	chineseText, err := p.transl.Translate(englishText)
+	recentContext := sess.GetWindow(5)
+	chineseText, err := p.transl.TranslateWithContext(englishText, recentContext)
 	if err != nil {
 		log.Printf("[ERROR] translate failed session=%s err=%v", sessionID, err)
 		chineseText = "[翻译失败]"
@@ -159,9 +160,16 @@ func (p *Pipeline) HandleUploadAudio(w http.ResponseWriter, r *http.Request) {
 						break
 					}
 				}
+				oldText := ""
+				for _, w := range window {
+					if w.Index == suggestion.SegmentIndex {
+						oldText = w.Translation
+						break
+					}
+				}
 				if sess.ApplyCorrection(suggestion.SegmentIndex, suggestion.NewTranslation, newRev) {
 					corrEvt := sse.BuildCorrection(p.eventID, suggestion.SegmentIndex,
-						"", suggestion.NewTranslation, newRev)
+						oldText, suggestion.NewTranslation, newRev)
 					p.broker.Publish(sessionID, corrEvt)
 					log.Printf("[sse] published subtitle.corrected session=%s segmentId=%d rev=%d",
 						sessionID, suggestion.SegmentIndex, newRev)

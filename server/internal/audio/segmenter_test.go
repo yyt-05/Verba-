@@ -69,6 +69,26 @@ func TestSegmenterForceFlushesLongSpeech(t *testing.T) {
 	}
 }
 
+func TestSegmenterFlushesLowLevelSystemAudio(t *testing.T) {
+	seg := NewSegmenter(48000)
+
+	var ready bool
+	var out []byte
+	for i := 0; i < 7; i++ {
+		out, ready = seg.AddPCM(testPCM(48000, 300, 120))
+		if ready {
+			break
+		}
+	}
+
+	if !ready {
+		t.Fatal("low-level system audio should be flushed for ASR after about 2 seconds")
+	}
+	if len(out) == 0 {
+		t.Fatal("completed segment should contain audio")
+	}
+}
+
 func testPCM(sampleRate, durationMs int, amplitude int16) []byte {
 	samples := sampleRate * durationMs / 1000
 	data := make([]byte, samples*2)

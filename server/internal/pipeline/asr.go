@@ -8,6 +8,7 @@ import (
 	"log"
 	"mime/multipart"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -86,8 +87,25 @@ func (a *ASRClient) Transcribe(audioData []byte) (string, error) {
 	}
 
 	result := string(body)
+	result = parseTranscriptionText(result)
 	log.Printf("[asr] response text=%q dur=%dms", result, time.Since(start).Milliseconds())
 	return result, nil
+}
+
+func parseTranscriptionText(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+
+	var payload struct {
+		Text string `json:"text"`
+	}
+	if err := json.Unmarshal([]byte(raw), &payload); err == nil {
+		return strings.TrimSpace(payload.Text)
+	}
+
+	return raw
 }
 
 var _ = io.Discard

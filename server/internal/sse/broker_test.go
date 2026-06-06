@@ -143,3 +143,40 @@ func TestBuildCorrection(t *testing.T) {
 		t.Fatalf("expected revision 2, got %d", evt.Revision)
 	}
 }
+
+func TestSubtitleEventsCarryRevisionStatusAndSequence(t *testing.T) {
+	finalEvt := BuildSubtitleFinal(200, 9, "Hello", "你好")
+	if finalEvt.EventSeq != 200 {
+		t.Fatalf("expected eventSeq 200, got %d", finalEvt.EventSeq)
+	}
+	if finalEvt.SegmentSeq != 9 {
+		t.Fatalf("expected segmentSeq 9, got %d", finalEvt.SegmentSeq)
+	}
+	if finalEvt.Status != "final" || !finalEvt.IsFinal {
+		t.Fatalf("expected final status, got status=%s isFinal=%v", finalEvt.Status, finalEvt.IsFinal)
+	}
+
+	var finalBody map[string]interface{}
+	if err := json.Unmarshal(finalEvt.Data, &finalBody); err != nil {
+		t.Fatalf("failed to parse final data: %v", err)
+	}
+	if finalBody["status"] != "final" || finalBody["isFinal"] != true {
+		t.Fatalf("expected final payload status, got %#v", finalBody)
+	}
+
+	corrEvt := BuildCorrection(201, 9, "旧译文", "新译文", 2)
+	if corrEvt.EventSeq != 201 {
+		t.Fatalf("expected eventSeq 201, got %d", corrEvt.EventSeq)
+	}
+	if corrEvt.Status != "corrected" || !corrEvt.IsFinal {
+		t.Fatalf("expected corrected status, got status=%s isFinal=%v", corrEvt.Status, corrEvt.IsFinal)
+	}
+
+	var corrBody map[string]interface{}
+	if err := json.Unmarshal(corrEvt.Data, &corrBody); err != nil {
+		t.Fatalf("failed to parse correction data: %v", err)
+	}
+	if corrBody["oldText"] != "旧译文" || corrBody["newText"] != "新译文" {
+		t.Fatalf("expected correction old/new text, got %#v", corrBody)
+	}
+}

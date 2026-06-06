@@ -20,14 +20,18 @@ const (
 
 // Event represents a single SSE event pushed to the client.
 type Event struct {
-	ID          int             `json:"id"`
-	Type        string          `json:"type"`
-	Data        json.RawMessage `json:"data"`
-	Timestamp   int64           `json:"timestamp"`
-	SegmentID   int             `json:"segmentId,omitempty"`
-	Revision    int             `json:"revision,omitempty"`
-	OldText     string          `json:"oldText,omitempty"`
-	NewText     string          `json:"newText,omitempty"`
+	ID         int             `json:"id"`
+	Type       string          `json:"type"`
+	Data       json.RawMessage `json:"data"`
+	Timestamp  int64           `json:"timestamp"`
+	EventSeq   int             `json:"eventSeq,omitempty"`
+	SegmentID  int             `json:"segmentId,omitempty"`
+	SegmentSeq int             `json:"segmentSeq,omitempty"`
+	Revision   int             `json:"revision,omitempty"`
+	Status     string          `json:"status,omitempty"`
+	IsFinal    bool            `json:"isFinal,omitempty"`
+	OldText    string          `json:"oldText,omitempty"`
+	NewText    string          `json:"newText,omitempty"`
 }
 
 // Broker manages SSE connections per session.
@@ -124,33 +128,49 @@ func (b *Broker) HandleSSE(w http.ResponseWriter, r *http.Request) {
 func BuildSubtitleFinal(id int, segmentID int, original, translation string) Event {
 	body, _ := json.Marshal(map[string]interface{}{
 		"segmentId":   segmentID,
+		"segmentSeq":  segmentID,
 		"original":    original,
 		"translation": translation,
+		"revision":    1,
+		"status":      "final",
+		"isFinal":     true,
 	})
 	return Event{
-		ID:        id,
-		Type:      EventSubtitleFinal,
-		Data:      body,
-		SegmentID: segmentID,
-		Revision:  1,
+		ID:         id,
+		Type:       EventSubtitleFinal,
+		Data:       body,
+		EventSeq:   id,
+		SegmentID:  segmentID,
+		SegmentSeq: segmentID,
+		Revision:   1,
+		Status:     "final",
+		IsFinal:    true,
 	}
 }
 
 // BuildCorrection creates a correction event.
 func BuildCorrection(id int, segmentID int, oldText, newText string, revision int) Event {
 	body, _ := json.Marshal(map[string]interface{}{
-		"segmentId":   segmentID,
-		"newText":     newText,
-		"revision":    revision,
+		"segmentId":  segmentID,
+		"segmentSeq": segmentID,
+		"oldText":    oldText,
+		"newText":    newText,
+		"revision":   revision,
+		"status":     "corrected",
+		"isFinal":    true,
 	})
 	return Event{
-		ID:        id,
-		Type:      EventSubtitleCorrected,
-		Data:      body,
-		SegmentID: segmentID,
-		OldText:   oldText,
-		NewText:   newText,
-		Revision:  revision,
+		ID:         id,
+		Type:       EventSubtitleCorrected,
+		Data:       body,
+		EventSeq:   id,
+		SegmentID:  segmentID,
+		SegmentSeq: segmentID,
+		OldText:    oldText,
+		NewText:    newText,
+		Revision:   revision,
+		Status:     "corrected",
+		IsFinal:    true,
 	}
 }
 
