@@ -147,12 +147,12 @@ Map<String, dynamic>? parseSubtitleEventData(String rawData) {
     final nested = event['data'];
 
     if (nested is Map<String, dynamic>) {
-      return {...event, ...nested, if (type != null) 'type': type};
+      return {...event, ...nested, 'type': ?type};
     }
 
     if (nested is String) {
       final decoded = jsonDecode(nested) as Map<String, dynamic>;
-      return {...event, ...decoded, if (type != null) 'type': type};
+      return {...event, ...decoded, 'type': ?type};
     }
 
     return event;
