@@ -70,9 +70,9 @@ Bug 修复 = 先写复现测试 → 跑测试(红) → 修复 → 跑测试(绿)
 Verba/
 ├── CLAUDE.md                    # 本文件 - 开发规范
 ├── docs/
-│   ├── product-requirements.md  # PRD
-│   ├── requirement-review.md    # 多角色评审
-│   └── test-coverage.md         # 测试覆盖说明
+│   ├── 产品需求.md  # PRD
+│   ├── 需求评审.md    # 多角色评审
+│   └── 测试覆盖.md         # 测试覆盖说明
 ├── server/                      # Go 后端
 │   ├── cmd/verba/main.go        # 入口 + 路由
 │   └── internal/
@@ -145,7 +145,7 @@ Step 7: 运行验证
         → 手动验收功能
 
 Step 8: 更新测试覆盖文档
-        → docs/test-coverage.md 补充新测试的覆盖说明
+        → docs/测试覆盖.md 补充新测试的覆盖说明
 ```
 
 ### Bug 修复的标准流程
