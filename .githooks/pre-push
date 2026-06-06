@@ -1,0 +1,26 @@
+#!/bin/bash
+set -e
+
+echo "==> 本地 CI 校验..."
+echo ""
+
+# ---- Go 后端 ----
+echo "--- [server] go vet ---"
+cd server && go vet ./... && cd ..
+echo "  OK"
+
+echo "--- [server] go test ---"
+cd server && go test -count=1 ./... && cd ..
+echo "  OK"
+
+# ---- Flutter 前端 ----
+echo "--- [client] flutter analyze ---"
+cd client && flutter analyze && cd ..
+echo "  OK"
+
+echo "--- [client] flutter test ---"
+cd client && flutter test && cd ..
+echo "  OK"
+
+echo ""
+echo "==> 全部通过，允许 push"
