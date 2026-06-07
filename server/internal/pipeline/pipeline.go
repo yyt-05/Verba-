@@ -11,12 +11,13 @@ import (
 
 	"github.com/verba/server/internal/audio"
 	"github.com/verba/server/internal/config"
+	"github.com/verba/server/internal/diarization"
 	"github.com/verba/server/internal/session"
 	"github.com/verba/server/internal/sse"
 	"github.com/verba/server/internal/tts"
 )
 
-// Pipeline orchestrates the ASR 鈫?translate 鈫?correct 鈫?SSE pipeline.
+// Pipeline orchestrates the ASR, translation, correction, and SSE pipeline.
 type Pipeline struct {
 	cfg     *config.Config
 	mgr     *session.Manager
@@ -24,6 +25,7 @@ type Pipeline struct {
 	asr     *ASRClient
 	transl  *Translator
 	corr    *Corrector
+	diar    *diarization.Manager
 	tts     *tts.Manager
 	eventID int
 	eventMu sync.Mutex
@@ -53,6 +55,16 @@ func New(cfg *config.Config, mgr *session.Manager, broker *sse.Broker) *Pipeline
 		segmenters:  make(map[string]*audio.Segmenter),
 		ttsChunkers: make(map[string]*tts.StreamChunker),
 	}
+	pipe.diar = diarization.NewManager(diarization.Config{
+		Provider:    cfg.DiarizationProvider,
+		APIKey:      cfg.DeepgramAPIKey,
+		RealtimeURL: cfg.DeepgramRealtimeURL,
+		Model:       cfg.DeepgramModel,
+		Language:    cfg.DeepgramLanguage,
+		OnFinal: func(sessionID string, transcript diarization.Transcript) {
+			pipe.handleFinalTranscript(sessionID, transcript.Text, transcript.Speaker)
+		},
+	})
 	pipe.tts = tts.NewManager(tts.Config{
 		Provider:        cfg.TTSProvider,
 		DashScopeAPIKey: cfg.DashScopeAPIKey,
@@ -68,6 +80,13 @@ func New(cfg *config.Config, mgr *session.Manager, broker *sse.Broker) *Pipeline
 		},
 	})
 	return pipe
+}
+
+func (p *Pipeline) nextEventID() int {
+	p.eventMu.Lock()
+	defer p.eventMu.Unlock()
+	p.eventID++
+	return p.eventID
 }
 
 func (p *Pipeline) publishTTSAudio(sessionID string, audio []byte) {
@@ -89,12 +108,15 @@ func (p *Pipeline) publishTTSAudioReset(sessionID string) {
 	p.broker.Publish(sessionID, sse.BuildTTSAudioReset(id))
 }
 
-// HandleCreateSession 鈥?POST /api/v1/sessions
+// HandleCreateSession handles POST /api/v1/sessions.
 func (p *Pipeline) HandleCreateSession(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	id := fmt.Sprintf("sess_%d", time.Now().UnixMilli())
 	sess := p.mgr.Create(id)
 	p.segmenterFor(id)
+	if err := p.diar.Start(id); err != nil {
+		log.Printf("[WARN] diarization start failed session=%s err=%v", id, err)
+	}
 
 	log.Printf("[http] POST /api/v1/sessions session=%s status=%s dur=%dms",
 		id, sess.Status, time.Since(start).Milliseconds())
@@ -112,7 +134,7 @@ func (p *Pipeline) HandleCreateSession(w http.ResponseWriter, r *http.Request) {
 	w.Write(resp)
 }
 
-// HandleUploadAudio 鈥?POST /api/v1/sessions/{sessionId}/audio
+// HandleUploadAudio handles POST /api/v1/sessions/{sessionId}/audio.
 func (p *Pipeline) HandleUploadAudio(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	sessionID := r.PathValue("sessionId")
@@ -135,6 +157,15 @@ func (p *Pipeline) HandleUploadAudio(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[audio] received session=%s bytes=%d rms=%.1f dur=%dms",
 		sessionID, len(body), rms, time.Since(start).Milliseconds())
 
+	if p.diar.Enabled() {
+		if err := p.diar.AddPCM(sessionID, body); err != nil {
+			log.Printf("[WARN] diarization audio send failed session=%s err=%v", sessionID, err)
+		}
+		w.WriteHeader(http.StatusAccepted)
+		w.Write([]byte(`{"status":"streaming"}`))
+		return
+	}
+
 	segment, ready := p.segmenterFor(sessionID).AddPCM(body)
 	if !ready {
 		w.WriteHeader(http.StatusAccepted)
@@ -153,10 +184,36 @@ func (p *Pipeline) HandleUploadAudio(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if englishText == "" {
-		// Silent or unrecognized audio 鈥?skip
+		// Silent or unrecognized audio; skip.
 		w.WriteHeader(http.StatusAccepted)
 		w.Write([]byte(`{"status":"ok"}`))
 		return
+	}
+
+	speaker := sess.GetCurrentSpeaker()
+	if speaker == "" {
+		speaker = "A"
+	}
+	p.handleFinalTranscript(sessionID, englishText, speaker)
+
+	w.WriteHeader(http.StatusAccepted)
+	w.Write([]byte(`{"status":"ok"}`))
+}
+
+func (p *Pipeline) handleFinalTranscript(sessionID, englishText, speaker string) {
+	sess := p.mgr.Get(sessionID)
+	if sess == nil {
+		log.Printf("[WARN] transcript session not found session=%s", sessionID)
+		return
+	}
+	if englishText == "" {
+		return
+	}
+	if speaker == "" {
+		speaker = sess.GetCurrentSpeaker()
+	}
+	if speaker == "" {
+		speaker = "A"
 	}
 
 	background := sess.GetBackgroundSummary()
@@ -168,13 +225,7 @@ func (p *Pipeline) HandleUploadAudio(w http.ResponseWriter, r *http.Request) {
 		chineseText = "[翻译失败]"
 	}
 
-	speaker, spErr := p.transl.DetectSpeaker(englishText, chineseText, recentContext, sess.GetCurrentSpeaker())
-	if spErr != nil {
-		log.Printf("[WARN] speaker detect failed session=%s err=%v", sessionID, spErr)
-		speaker = sess.GetCurrentSpeaker()
-	}
-
-	p.eventID++
+	eventID := p.nextEventID()
 	seg, shouldCorrect := sess.AppendSentence(englishText, chineseText, speaker)
 
 	// Background context summarization: every 10 sentences, async refresh.
@@ -182,13 +233,12 @@ func (p *Pipeline) HandleUploadAudio(w http.ResponseWriter, r *http.Request) {
 		go p.refreshBackgroundSummary(sessionID, sess)
 	}
 
-	evt := sse.BuildSubtitleFinal(p.eventID, seg.Index, seg.Original, seg.Translation, speaker)
+	evt := sse.BuildSubtitleFinal(eventID, seg.Index, seg.Original, seg.Translation, speaker)
 	p.broker.Publish(sessionID, evt)
 	log.Printf("[sse] published subtitle.final session=%s segmentId=%d", sessionID, seg.Index)
 
 	// Correction engine
 	if shouldCorrect {
-		p.eventID++
 		window := sess.GetWindow(p.corr.WindowSize)
 		lookbackStart := len(window) - p.corr.LookbackCount
 		if lookbackStart < 0 {
@@ -222,7 +272,7 @@ func (p *Pipeline) HandleUploadAudio(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 				if sess.ApplyCorrection(suggestion.SegmentIndex, suggestion.NewTranslation, newRev) {
-					corrEvt := sse.BuildCorrection(p.eventID, suggestion.SegmentIndex,
+					corrEvt := sse.BuildCorrection(p.nextEventID(), suggestion.SegmentIndex,
 						oldText, suggestion.NewTranslation, newRev)
 					p.broker.Publish(sessionID, corrEvt)
 					log.Printf("[sse] published subtitle.corrected session=%s segmentId=%d rev=%d",
@@ -232,11 +282,9 @@ func (p *Pipeline) HandleUploadAudio(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	w.WriteHeader(http.StatusAccepted)
-	w.Write([]byte(`{"status":"ok"}`))
 }
 
-// HandleStopSession 鈥?POST /api/v1/sessions/{sessionId}/stop
+// translateForSession translates a finalized transcript for one session.
 func (p *Pipeline) translateForSession(sessionID, englishText string, recent []session.Sentence, background string) (string, error) {
 	if !p.tts.Enabled(sessionID) {
 		return p.transl.TranslateWithContext(englishText, recent, background)
@@ -257,20 +305,6 @@ func (p *Pipeline) translateForSession(sessionID, englishText string, recent []s
 	}
 	speakChunks(chunker.Ready(time.Now().Add(750 * time.Millisecond)))
 	return result, nil
-}
-
-func endsWithBoundary(text string) bool {
-	runes := []rune(text)
-	if len(runes) == 0 {
-		return false
-	}
-	last := runes[len(runes)-1]
-	switch last {
-	case 0xff0c, 0x3002, 0xff01, 0xff1f, 0xff1b, 0xff1a, 0x3001, ',', '.', '!', '?', ';', ':':
-		return true
-	default:
-		return false
-	}
 }
 
 // HandleTTSControl toggles realtime Chinese speech for a session.
@@ -314,6 +348,7 @@ func (p *Pipeline) HandleStopSession(w http.ResponseWriter, r *http.Request) {
 
 	duration := time.Since(sess.CreatedAt)
 	sess.SetStatus(session.StatusStopped)
+	p.diar.Stop(sessionID)
 	p.tts.Disable(sessionID)
 
 	statusData, _ := json.Marshal(map[string]string{"status": "stopped"})
@@ -345,12 +380,12 @@ func (p *Pipeline) HandleDebugCorrection(w http.ResponseWriter, r *http.Request)
 
 	// Seed 6 varied sentences so the correction window has enough data.
 	pairs := [][2]string{
-		{"The transformer architecture revolutionized NLP.", "Transformer架构革新了自然语言处理。"},
+		{"The transformer architecture revolutionized NLP.", "Transformer 架构革新了自然语言处理。"},
 		{"It uses self-attention to process sequences.", "它使用自注意力来处理序列。"},
 		{"The model computes attention weights.", "该模型计算注意力权重。"},
 		{"Attention helps the model focus on relevant tokens.", "注意力帮助模型聚焦于相关标记。"},
 		{"The decoder generates output tokens one by one.", "解码器逐一生成输出标记。"},
-		{"This approach has become the foundation of modern AI.", "这种方法已成为现代AI的基础。"},
+		{"This approach has become the foundation of modern AI.", "这种方法已经成为现代 AI 的基础。"},
 	}
 	for _, pair := range pairs {
 		sess.AppendSentence(pair[0], pair[1], "A")
@@ -358,7 +393,7 @@ func (p *Pipeline) HandleDebugCorrection(w http.ResponseWriter, r *http.Request)
 
 	// Force a correction on the first sentence (segment index 0).
 	oldText := pairs[0][1]
-	newText := "Transformer架构彻底改变了自然语言处理领域。"
+	newText := "Transformer 架构彻底改变了自然语言处理领域。"
 	newRev := int(2)
 
 	if sess.ApplyCorrection(0, newText, newRev) {
