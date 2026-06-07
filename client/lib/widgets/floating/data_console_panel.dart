@@ -1,14 +1,11 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/subtitle_entry.dart';
 import '../../providers/session_provider.dart';
 import '../../theme/verba_theme.dart';
 import 'floating_icon.dart';
 import 'glass_surface.dart';
 
-class DataConsolePanel extends ConsumerStatefulWidget {
+class DataConsolePanel extends StatelessWidget {
   final SessionState state;
   final List<SubtitleEntry> subtitles;
   final VoidCallback onCollapse;
@@ -25,45 +22,8 @@ class DataConsolePanel extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<DataConsolePanel> createState() => _DataConsolePanelState();
-}
-
-class _DataConsolePanelState extends ConsumerState<DataConsolePanel> {
-  Timer? _timer;
-  double _level = 0;
-  int _availableBytes = 0;
-  bool _capturing = false;
-  String _diag = '';
-
-  @override
-  void initState() {
-    super.initState();
-    _readAudioState();
-    _timer = Timer.periodic(const Duration(milliseconds: 250), (_) {
-      if (mounted) _readAudioState();
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  void _readAudioState() {
-    final wasapi = ref.read(wasapiProvider);
-    setState(() {
-      _capturing = wasapi.isCapturing;
-      _availableBytes = wasapi.availableBytes;
-      _level = wasapi.level.clamp(0.0, 1.0).toDouble();
-      _diag = wasapi.diag;
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final corrections = widget.subtitles.where((e) => e.isCorrected).length;
-    final receiving = _capturing && _availableBytes > 0;
+    final updates = subtitles.where((e) => e.isCorrected).length;
 
     return GlassSurface(
       radius: 16,
@@ -71,8 +31,8 @@ class _DataConsolePanelState extends ConsumerState<DataConsolePanel> {
       padding: EdgeInsets.zero,
       borderColor: VerbaColors.inkWhite,
       child: SizedBox(
-        width: 460,
-        height: 340,
+        width: 430,
+        height: 300,
         child: Column(
           children: [
             Padding(
@@ -85,11 +45,12 @@ class _DataConsolePanelState extends ConsumerState<DataConsolePanel> {
                       color: VerbaColors.inkWhite,
                       fontSize: 17,
                       fontWeight: FontWeight.w900,
+                      decoration: TextDecoration.none,
                     ),
                   ),
                   const Spacer(),
                   GestureDetector(
-                    onTap: widget.onCollapse,
+                    onTap: onCollapse,
                     child: const FloatingIcon(name: 'verba-collapse', size: 28),
                   ),
                 ],
@@ -102,28 +63,14 @@ class _DataConsolePanelState extends ConsumerState<DataConsolePanel> {
                 children: [
                   Row(
                     children: [
-                      _MetricCard(
-                        label: '状态',
-                        value: _stateLabel(widget.state),
-                      ),
+                      _MetricCard(label: '状态', value: _stateLabel(state)),
                       const SizedBox(width: 8),
-                      _MetricCard(
-                        label: '字幕',
-                        value: '${widget.subtitles.length}',
-                      ),
+                      _MetricCard(label: '字幕', value: '${subtitles.length}'),
                       const SizedBox(width: 8),
-                      _MetricCard(label: '修正', value: '$corrections'),
+                      _MetricCard(label: '更新', value: '$updates'),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  _AudioStatusCard(
-                    capturing: _capturing,
-                    receiving: receiving,
-                    level: _level,
-                    availableBytes: _availableBytes,
-                    diag: _diag,
-                  ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
                   Row(
                     children: [
                       const FloatingIcon(name: 'verba-audio-source', size: 30),
@@ -135,17 +82,27 @@ class _DataConsolePanelState extends ConsumerState<DataConsolePanel> {
                             color: VerbaColors.inkWhite,
                             fontSize: 13,
                             fontWeight: FontWeight.w800,
+                            decoration: TextDecoration.none,
                           ),
                         ),
                       ),
-                      _ActionButton(label: '清空', onTap: widget.onClear),
+                      _ActionButton(label: '清空', onTap: onClear),
                       const SizedBox(width: 8),
-                      _ActionButton(
-                        label: '停止',
-                        danger: true,
-                        onTap: widget.onStop,
-                      ),
+                      _ActionButton(label: '停止', danger: true, onTap: onStop),
                     ],
+                  ),
+                  const SizedBox(height: 14),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      '字幕会按上下文持续更新；主窗口以整段显示为主。',
+                      style: TextStyle(
+                        color: VerbaColors.mutedGray.withValues(alpha: 0.9),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -159,105 +116,13 @@ class _DataConsolePanelState extends ConsumerState<DataConsolePanel> {
   String _stateLabel(SessionState state) {
     return switch (state) {
       SessionState.connecting => '连接中',
-      SessionState.listening => '监听',
-      SessionState.reconnecting => '重连',
-      SessionState.stopped => '停止',
-      SessionState.apiError => '错误',
+      SessionState.listening => '监听中',
+      SessionState.reconnecting => '重连中',
+      SessionState.stopped => '已停止',
+      SessionState.apiError => '接口错误',
       SessionState.audioSourceUnavailable => '无音频',
       _ => '待机',
     };
-  }
-}
-
-class _AudioStatusCard extends StatelessWidget {
-  final bool capturing;
-  final bool receiving;
-  final double level;
-  final int availableBytes;
-  final String diag;
-
-  const _AudioStatusCard({
-    required this.capturing,
-    required this.receiving,
-    required this.level,
-    required this.availableBytes,
-    required this.diag,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final status = !capturing
-        ? '未捕获'
-        : receiving
-        ? '收到系统音频'
-        : '捕获中，无可读音频';
-    final color = receiving
-        ? VerbaColors.successGreen
-        : capturing
-        ? VerbaColors.accentYellow
-        : VerbaColors.mutedGray;
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 9,
-                height: 9,
-                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                status,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                '音量 ${(level * 100).toStringAsFixed(0)}%',
-                style: const TextStyle(
-                  color: VerbaColors.inkWhite,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              minHeight: 7,
-              value: level.clamp(0.0, 1.0),
-              backgroundColor: Colors.white.withValues(alpha: 0.08),
-              color: color,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'buffer: $availableBytes bytes  |  $diag',
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: VerbaColors.mutedGray,
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }
 
@@ -284,19 +149,21 @@ class _MetricCard extends StatelessWidget {
           children: [
             Text(
               label,
-              style: const TextStyle(
-                color: VerbaColors.mutedGray,
+              style: TextStyle(
+                color: VerbaColors.mutedGray.withValues(alpha: 0.9),
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
+                decoration: TextDecoration.none,
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 5),
             Text(
               value,
               style: const TextStyle(
                 color: VerbaColors.inkWhite,
-                fontSize: 22,
+                fontSize: 16,
                 fontWeight: FontWeight.w900,
+                decoration: TextDecoration.none,
               ),
             ),
           ],
@@ -321,20 +188,29 @@ class _ActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: danger
-              ? VerbaColors.dangerRed
-              : Colors.white.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(
-            color: VerbaColors.inkWhite,
-            fontSize: 12,
-            fontWeight: FontWeight.w900,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          decoration: BoxDecoration(
+            color: danger
+                ? VerbaColors.dangerRed.withValues(alpha: 0.18)
+                : Colors.white.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: danger
+                  ? VerbaColors.dangerRed.withValues(alpha: 0.35)
+                  : Colors.white.withValues(alpha: 0.08),
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: danger ? VerbaColors.dangerRed : VerbaColors.inkWhite,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              decoration: TextDecoration.none,
+            ),
           ),
         ),
       ),

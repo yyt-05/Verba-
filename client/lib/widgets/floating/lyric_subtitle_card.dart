@@ -20,33 +20,45 @@ class LyricSubtitleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final recent = _recentParagraph(subtitles);
-    final corrected = _latestCorrected(subtitles);
-    final showCorrection = correctionPreview && corrected != null;
+    final original = _joinOriginal(recent);
+    final translation = _joinTranslation(recent);
+    final hasContent = translation.isNotEmpty || original.isNotEmpty;
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final maxWidth = constraints.hasBoundedWidth
             ? constraints.maxWidth - 24
             : 720.0;
-        final width = maxWidth.clamp(340.0, 920.0).toDouble();
+        final width = (560.0 * fontScale)
+            .clamp(360.0, maxWidth.clamp(360.0, 760.0))
+            .toDouble();
 
         return GestureDetector(
           onTap: onTap,
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
+            duration: const Duration(milliseconds: 220),
             width: width,
             child: GlassSurface(
-              radius: 10,
-              opacity: showCorrection ? 0.42 : 0.34,
-              borderColor: VerbaColors.textBlue,
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-              child: showCorrection
-                  ? _CorrectionPreview(
-                      entry: corrected,
-                      subtitles: subtitles,
+              radius: 12,
+              opacity: 0.46,
+              borderColor: VerbaColors.inkWhite,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: hasContent
+                  ? _ParagraphView(
+                      original: original,
+                      translation: translation,
                       fontScale: fontScale,
                     )
-                  : _ParagraphSubtitle(entries: recent, fontScale: fontScale),
+                  : const Text(
+                      '正在等待英文音频...',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: VerbaColors.mutedGray,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
             ),
           ),
         );
@@ -56,216 +68,89 @@ class LyricSubtitleCard extends StatelessWidget {
 
   List<SubtitleEntry> _recentParagraph(List<SubtitleEntry> entries) {
     if (entries.isEmpty) return const [];
-    final selected = <SubtitleEntry>[];
-    var originalChars = 0;
-    var translationChars = 0;
-
-    for (var i = entries.length - 1; i >= 0 && selected.length < 4; i--) {
-      final entry = entries[i];
-      originalChars += entry.original.length;
-      translationChars += entry.translation.length;
-      selected.insert(0, entry);
-      if (originalChars > 260 || translationChars > 180) break;
-    }
-    return selected;
+    final start = entries.length > 5 ? entries.length - 5 : 0;
+    return entries.sublist(start);
   }
 
-  SubtitleEntry? _latestCorrected(List<SubtitleEntry> entries) {
-    for (var i = entries.length - 1; i >= 0; i--) {
-      if (entries[i].isCorrected) return entries[i];
-    }
-    return null;
+  String _joinOriginal(List<SubtitleEntry> entries) {
+    return entries
+        .map((entry) => entry.original.trim())
+        .where((text) => text.isNotEmpty)
+        .join(' ');
+  }
+
+  String _joinTranslation(List<SubtitleEntry> entries) {
+    return entries
+        .map((entry) => entry.translation.trim())
+        .where((text) => text.isNotEmpty)
+        .join('');
   }
 }
 
-class _ParagraphSubtitle extends StatelessWidget {
-  final List<SubtitleEntry> entries;
+class _ParagraphView extends StatelessWidget {
+  final String original;
+  final String translation;
   final double fontScale;
 
-  const _ParagraphSubtitle({required this.entries, required this.fontScale});
-
-  @override
-  Widget build(BuildContext context) {
-    if (entries.isEmpty) {
-      return const Text(
-        '正在等待英文音频...',
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          color: VerbaColors.mutedGray,
-          fontSize: 14,
-          fontWeight: FontWeight.w700,
-          decoration: TextDecoration.none,
-        ),
-      );
-    }
-
-    final current = entries.last;
-    final isDraft = current.status == SubtitleStatus.draft;
-    final sourceAlpha = isDraft ? 0.42 : 0.68;
-    final original = entries.map((e) => e.original).join(' ');
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          original,
-          textAlign: TextAlign.left,
-          softWrap: true,
-          style: _subtitleStyle(
-            color: VerbaColors.inkWhite.withValues(alpha: sourceAlpha),
-            size: 13 * fontScale,
-            weight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 8),
-        RichText(
-          text: TextSpan(
-            children: [
-              for (final entry in entries)
-                ..._translationSpans(
-                  entry,
-                  size: 21 * fontScale,
-                  weight: FontWeight.w800,
-                  isDraft: isDraft,
-                ),
-            ],
-          ),
-          softWrap: true,
-        ),
-      ],
-    );
-  }
-}
-
-class _CorrectionPreview extends StatelessWidget {
-  final SubtitleEntry entry;
-  final List<SubtitleEntry> subtitles;
-  final double fontScale;
-
-  const _CorrectionPreview({
-    required this.entry,
-    required this.subtitles,
+  const _ParagraphView({
+    required this.original,
+    required this.translation,
     required this.fontScale,
   });
 
   @override
   Widget build(BuildContext context) {
-    final index = subtitles.indexWhere((e) => e.segmentId == entry.segmentId);
-    final previous = index > 0 ? subtitles[index - 1].translation : null;
-    final next = index >= 0 && index < subtitles.length - 1
-        ? subtitles[index + 1].translation
-        : null;
-
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (previous != null)
-          Text('上一句：$previous', softWrap: true, style: _metaStyle()),
-        const SizedBox(height: 8),
-        Text(
-          entry.original,
-          softWrap: true,
-          style: _subtitleStyle(
-            color: VerbaColors.inkWhite.withValues(alpha: 0.72),
-            size: 13 * fontScale,
-            weight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 6),
-        RichText(
-          text: TextSpan(
-            children: _translationSpans(
-              entry,
-              size: 21 * fontScale,
-              weight: FontWeight.w800,
-              isDraft: false,
+        if (original.isNotEmpty)
+          Text(
+            original,
+            maxLines: 4,
+            overflow: TextOverflow.ellipsis,
+            style: _shadowStyle(
+              color: VerbaColors.inkWhite.withValues(alpha: 0.64),
+              size: 13 * fontScale,
+              weight: FontWeight.w600,
             ),
           ),
-          softWrap: true,
-        ),
-        if (next != null) ...[
+        if (original.isNotEmpty && translation.isNotEmpty)
           const SizedBox(height: 8),
-          Text('下一句：$next', softWrap: true, style: _metaStyle()),
-        ],
+        if (translation.isNotEmpty)
+          Text(
+            translation,
+            maxLines: 5,
+            overflow: TextOverflow.ellipsis,
+            style: _shadowStyle(
+              color: VerbaColors.inkWhite,
+              size: 21 * fontScale,
+              weight: FontWeight.w900,
+            ),
+          ),
       ],
     );
   }
 }
 
-List<TextSpan> _translationSpans(
-  SubtitleEntry entry, {
-  required double size,
-  required FontWeight weight,
-  required bool isDraft,
-}) {
-  final oldText = entry.oldTranslation?.trim();
-  if (entry.isCorrected && oldText != null && oldText.isNotEmpty) {
-    return [
-      TextSpan(
-        text: oldText,
-        style: _subtitleStyle(
-          color: VerbaColors.mutedGray.withValues(alpha: 0.72),
-          size: size,
-          weight: weight,
-          decoration: TextDecoration.lineThrough,
-        ),
-      ),
-      TextSpan(
-        text: ' ${entry.translation}',
-        style: _subtitleStyle(
-          color: VerbaColors.accentYellow,
-          size: size,
-          weight: FontWeight.w900,
-        ),
-      ),
-    ];
-  }
-
-  return [
-    TextSpan(
-      text: entry.translation,
-      style: _subtitleStyle(
-        color: VerbaColors.inkWhite.withValues(alpha: isDraft ? 0.62 : 1.0),
-        size: size,
-        weight: weight,
-      ),
-    ),
-  ];
-}
-
-TextStyle _subtitleStyle({
+TextStyle _shadowStyle({
   required Color color,
   required double size,
   required FontWeight weight,
-  TextDecoration decoration = TextDecoration.none,
 }) {
   return TextStyle(
     color: color,
     fontSize: size,
     fontWeight: weight,
-    height: 1.28,
-    decoration: decoration,
-    decorationColor: color.withValues(alpha: 0.82),
-    decorationThickness: 1.4,
+    height: 1.35,
+    decoration: TextDecoration.none,
     shadows: [
       Shadow(
-        color: Colors.black.withValues(alpha: 0.68),
-        blurRadius: 5,
+        color: Colors.black.withValues(alpha: 0.86),
+        blurRadius: 8,
         offset: const Offset(0, 2),
       ),
-      Shadow(color: Colors.black.withValues(alpha: 0.28), blurRadius: 10),
+      Shadow(color: Colors.black.withValues(alpha: 0.48), blurRadius: 14),
     ],
-  );
-}
-
-TextStyle _metaStyle() {
-  return TextStyle(
-    color: VerbaColors.mutedGray.withValues(alpha: 0.82),
-    fontSize: 12,
-    fontWeight: FontWeight.w700,
-    height: 1.25,
-    decoration: TextDecoration.none,
   );
 }
