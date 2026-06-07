@@ -263,7 +263,7 @@ func tencentSpeakerLabel(speakerID int, sentences any) string {
 	if speakerID < 0 {
 		return ""
 	}
-	idx := speakerID
+	idx := speakerID % 2
 	if idx >= 0 && idx < 26 {
 		return string(rune('A' + idx))
 	}

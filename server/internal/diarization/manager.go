@@ -13,15 +13,17 @@ type stream interface {
 }
 
 type Manager struct {
-	cfg     Config
-	streams map[string]stream
-	mu      sync.Mutex
+	cfg      Config
+	streams  map[string]stream
+	speakers map[string]string // sessionID -> current speaker label
+	mu       sync.Mutex
 }
 
 func NewManager(cfg Config) *Manager {
 	return &Manager{
-		cfg:     cfg,
-		streams: make(map[string]stream),
+		cfg:      cfg,
+		streams:  make(map[string]stream),
+		speakers: make(map[string]string),
 	}
 }
 
@@ -88,7 +90,6 @@ func (m *Manager) AddPCM(sessionID string, pcm []byte) error {
 	}
 
 	// Split large chunks to avoid overwhelming the diarization API.
-	// Tencent rejects >3 seconds of audio per send.
 	const maxChunkBytes = 2 * 48000 * 2 // 2 seconds of 48kHz PCM16
 	for offset := 0; offset < len(pcm); offset += maxChunkBytes {
 		end := offset + maxChunkBytes
@@ -105,7 +106,6 @@ func (m *Manager) AddPCM(sessionID string, pcm []byte) error {
 			m.mu.Unlock()
 			return err
 		}
-		// Small pacing delay between chunks to respect rate limits.
 		if end < len(pcm) {
 			time.Sleep(200 * time.Millisecond)
 		}
@@ -113,10 +113,25 @@ func (m *Manager) AddPCM(sessionID string, pcm []byte) error {
 	return nil
 }
 
+// SetSpeaker records the current speaker label from the diarization provider.
+func (m *Manager) SetSpeaker(sessionID, speaker string) {
+	m.mu.Lock()
+	m.speakers[sessionID] = speaker
+	m.mu.Unlock()
+}
+
+// GetSpeaker returns the most recent speaker label, or "" if unknown.
+func (m *Manager) GetSpeaker(sessionID string) string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.speakers[sessionID]
+}
+
 func (m *Manager) Stop(sessionID string) {
 	m.mu.Lock()
 	s := m.streams[sessionID]
 	delete(m.streams, sessionID)
+	delete(m.speakers, sessionID)
 	m.mu.Unlock()
 	if s != nil {
 		s.Close()
