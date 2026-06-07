@@ -12,9 +12,9 @@ import (
 
 // Corrector implements the sliding-window correction engine.
 type Corrector struct {
-	WindowSize     int // context sentences to consider (default 12)
-	TriggerEvery   int // trigger correction every N new sentences (default 3)
-	LookbackCount  int // how many previous sentences to re-evaluate (default 6)
+	WindowSize    int // context sentences to consider (default 12)
+	TriggerEvery  int // trigger correction every N new sentences (default 3)
+	LookbackCount int // how many previous sentences to re-evaluate (default 6)
 }
 
 func NewCorrector() *Corrector {
@@ -27,8 +27,8 @@ func NewCorrector() *Corrector {
 
 // CorrectionSuggestion is returned by the LLM for a sentence that needs fixing.
 type CorrectionSuggestion struct {
-	SegmentIndex   int    `json:"segment_index"`
-	NewTranslation string `json:"new_translation"`
+	SegmentIndex   int     `json:"segment_index"`
+	NewTranslation string  `json:"new_translation"`
 	Confidence     float64 `json:"confidence"`
 }
 
@@ -38,14 +38,19 @@ func (c *Corrector) NeedsCorrection(sess *session.Session) bool {
 	if count < 6 {
 		return false
 	}
-	return count >= c.TriggerEvery && (count % c.TriggerEvery) == 0
+	return count >= c.TriggerEvery && (count%c.TriggerEvery) == 0
 }
 
 // BuildCorrectionPrompt creates the LLM prompt for the sliding window.
-func (c *Corrector) BuildCorrectionPrompt(window []session.Sentence, lookback []session.Sentence) string {
+func (c *Corrector) BuildCorrectionPrompt(window []session.Sentence, lookback []session.Sentence, background string) string {
 	var sb strings.Builder
-	sb.WriteString("你是一个翻译校对助手。以下是最近一段英文技术内容的翻译。请检查前面几句的翻译是否准确。")
+	sb.WriteString("你是一个翻译校对助手。以下是最近一段内容的翻译。请检查前面几句的翻译是否准确。")
 	sb.WriteString("如果发现翻译错误或不一致，请给出修正。\n\n")
+	if background != "" {
+		sb.WriteString("=== 对话背景 ===\n")
+		sb.WriteString(background)
+		sb.WriteString("\n\n")
+	}
 	sb.WriteString("=== 上下文原文与译文 ===\n")
 
 	for _, s := range window {

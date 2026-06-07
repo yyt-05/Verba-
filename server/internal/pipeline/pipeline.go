@@ -13,9 +13,10 @@ import (
 	"github.com/verba/server/internal/config"
 	"github.com/verba/server/internal/session"
 	"github.com/verba/server/internal/sse"
+	"github.com/verba/server/internal/tts"
 )
 
-// Pipeline orchestrates the ASR → translate → correct → SSE pipeline.
+// Pipeline orchestrates the ASR 鈫?translate 鈫?correct 鈫?SSE pipeline.
 type Pipeline struct {
 	cfg     *config.Config
 	mgr     *session.Manager
@@ -23,14 +24,18 @@ type Pipeline struct {
 	asr     *ASRClient
 	transl  *Translator
 	corr    *Corrector
+	tts     *tts.Manager
 	eventID int
+	eventMu sync.Mutex
 
-	segmenters   map[string]*audio.Segmenter
-	segmentersMu sync.Mutex
+	segmenters    map[string]*audio.Segmenter
+	segmentersMu  sync.Mutex
+	ttsChunkers   map[string]*tts.StreamChunker
+	ttsChunkersMu sync.Mutex
 }
 
 func New(cfg *config.Config, mgr *session.Manager, broker *sse.Broker) *Pipeline {
-	return &Pipeline{
+	pipe := &Pipeline{
 		cfg:    cfg,
 		mgr:    mgr,
 		broker: broker,
@@ -44,12 +49,47 @@ func New(cfg *config.Config, mgr *session.Manager, broker *sse.Broker) *Pipeline
 			BaseURL: cfg.SiliconFlowBaseURL,
 			Model:   cfg.TranslateModel,
 		}),
-		corr:       NewCorrector(),
-		segmenters: make(map[string]*audio.Segmenter),
+		corr:        NewCorrector(),
+		segmenters:  make(map[string]*audio.Segmenter),
+		ttsChunkers: make(map[string]*tts.StreamChunker),
 	}
+	pipe.tts = tts.NewManager(tts.Config{
+		Provider:        cfg.TTSProvider,
+		DashScopeAPIKey: cfg.DashScopeAPIKey,
+		RealtimeURL:     cfg.DashScopeRealtimeURL,
+		Model:           cfg.TTSModel,
+		Voice:           cfg.TTSVoice,
+		Language:        cfg.TTSLanguage,
+		OnAudio: func(sessionID string, audio []byte) {
+			pipe.publishTTSAudio(sessionID, audio)
+		},
+		OnReset: func(sessionID string) {
+			pipe.publishTTSAudioReset(sessionID)
+		},
+	})
+	return pipe
 }
 
-// HandleCreateSession — POST /api/v1/sessions
+func (p *Pipeline) publishTTSAudio(sessionID string, audio []byte) {
+	if len(audio) == 0 {
+		return
+	}
+	p.eventMu.Lock()
+	p.eventID++
+	id := p.eventID
+	p.eventMu.Unlock()
+	p.broker.Publish(sessionID, sse.BuildTTSAudioDelta(id, audio))
+}
+
+func (p *Pipeline) publishTTSAudioReset(sessionID string) {
+	p.eventMu.Lock()
+	p.eventID++
+	id := p.eventID
+	p.eventMu.Unlock()
+	p.broker.Publish(sessionID, sse.BuildTTSAudioReset(id))
+}
+
+// HandleCreateSession 鈥?POST /api/v1/sessions
 func (p *Pipeline) HandleCreateSession(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	id := fmt.Sprintf("sess_%d", time.Now().UnixMilli())
@@ -72,7 +112,7 @@ func (p *Pipeline) HandleCreateSession(w http.ResponseWriter, r *http.Request) {
 	w.Write(resp)
 }
 
-// HandleUploadAudio — POST /api/v1/sessions/{sessionId}/audio
+// HandleUploadAudio 鈥?POST /api/v1/sessions/{sessionId}/audio
 func (p *Pipeline) HandleUploadAudio(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	sessionID := r.PathValue("sessionId")
@@ -91,8 +131,9 @@ func (p *Pipeline) HandleUploadAudio(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	log.Printf("[audio] received session=%s bytes=%d dur=%dms",
-		sessionID, len(body), time.Since(start).Milliseconds())
+	rms := audio.PCMRMS(body)
+	log.Printf("[audio] received session=%s bytes=%d rms=%.1f dur=%dms",
+		sessionID, len(body), rms, time.Since(start).Milliseconds())
 
 	segment, ready := p.segmenterFor(sessionID).AddPCM(body)
 	if !ready {
@@ -112,23 +153,36 @@ func (p *Pipeline) HandleUploadAudio(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if englishText == "" {
-		// Silent or unrecognized audio — skip
+		// Silent or unrecognized audio 鈥?skip
 		w.WriteHeader(http.StatusAccepted)
 		w.Write([]byte(`{"status":"ok"}`))
 		return
 	}
 
+	background := sess.GetBackgroundSummary()
 	recentContext := sess.GetWindow(5)
-	chineseText, err := p.transl.TranslateWithContext(englishText, recentContext)
+	chineseText, err := p.translateForSession(sessionID, englishText, recentContext, background)
 	if err != nil {
+
 		log.Printf("[ERROR] translate failed session=%s err=%v", sessionID, err)
 		chineseText = "[翻译失败]"
 	}
 
-	p.eventID++
-	seg, shouldCorrect := sess.AppendSentence(englishText, chineseText)
+	speaker, spErr := p.transl.DetectSpeaker(englishText, chineseText, recentContext, sess.GetCurrentSpeaker())
+	if spErr != nil {
+		log.Printf("[WARN] speaker detect failed session=%s err=%v", sessionID, spErr)
+		speaker = sess.GetCurrentSpeaker()
+	}
 
-	evt := sse.BuildSubtitleFinal(p.eventID, seg.Index, seg.Original, seg.Translation)
+	p.eventID++
+	seg, shouldCorrect := sess.AppendSentence(englishText, chineseText, speaker)
+
+	// Background context summarization: every 10 sentences, async refresh.
+	if sess.NeedBackgroundSummary() {
+		go p.refreshBackgroundSummary(sessionID, sess)
+	}
+
+	evt := sse.BuildSubtitleFinal(p.eventID, seg.Index, seg.Original, seg.Translation, speaker)
 	p.broker.Publish(sessionID, evt)
 	log.Printf("[sse] published subtitle.final session=%s segmentId=%d", sessionID, seg.Index)
 
@@ -144,7 +198,7 @@ func (p *Pipeline) HandleUploadAudio(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[corrector] triggered session=%s window=%d lookback=%d",
 			sessionID, len(window), len(lookback))
 
-		prompt := p.corr.BuildCorrectionPrompt(window, lookback)
+		prompt := p.corr.BuildCorrectionPrompt(window, lookback, background)
 		suggestions, err := p.transl.Correct(prompt)
 		if err != nil {
 			log.Printf("[ERROR] corrector call failed session=%s err=%v", sessionID, err)
@@ -182,7 +236,73 @@ func (p *Pipeline) HandleUploadAudio(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(`{"status":"ok"}`))
 }
 
-// HandleStopSession — POST /api/v1/sessions/{sessionId}/stop
+// HandleStopSession 鈥?POST /api/v1/sessions/{sessionId}/stop
+func (p *Pipeline) translateForSession(sessionID, englishText string, recent []session.Sentence, background string) (string, error) {
+	if !p.tts.Enabled(sessionID) {
+		return p.transl.TranslateWithContext(englishText, recent, background)
+	}
+
+	chunker := p.ttsChunkerFor(sessionID)
+	speakChunks := func(chunks []string) {
+		for _, chunk := range chunks {
+			p.tts.Speak(sessionID, chunk)
+		}
+	}
+
+	result, err := p.transl.TranslateStreamWithContext(englishText, recent, background, func(delta string) {
+		speakChunks(chunker.Add(delta, time.Now()))
+	})
+	if err != nil {
+		return "", err
+	}
+	speakChunks(chunker.Ready(time.Now().Add(750 * time.Millisecond)))
+	return result, nil
+}
+
+func endsWithBoundary(text string) bool {
+	runes := []rune(text)
+	if len(runes) == 0 {
+		return false
+	}
+	last := runes[len(runes)-1]
+	switch last {
+	case 0xff0c, 0x3002, 0xff01, 0xff1f, 0xff1b, 0xff1a, 0x3001, ',', '.', '!', '?', ';', ':':
+		return true
+	default:
+		return false
+	}
+}
+
+// HandleTTSControl toggles realtime Chinese speech for a session.
+func (p *Pipeline) HandleTTSControl(w http.ResponseWriter, r *http.Request) {
+	sessionID := r.PathValue("sessionId")
+	if p.mgr.Get(sessionID) == nil {
+		http.Error(w, `{"error":"session not found"}`, http.StatusNotFound)
+		return
+	}
+
+	var body struct {
+		Enabled bool `json:"enabled"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, `{"error":"invalid body"}`, http.StatusBadRequest)
+		return
+	}
+
+	if body.Enabled {
+		if err := p.tts.Enable(sessionID); err != nil {
+			log.Printf("[tts] enable failed session=%s err=%v", sessionID, err)
+			http.Error(w, fmt.Sprintf(`{"error":%q}`, err.Error()), http.StatusBadRequest)
+			return
+		}
+	} else {
+		p.tts.Disable(sessionID)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(`{"status":"ok"}`))
+}
+
 func (p *Pipeline) HandleStopSession(w http.ResponseWriter, r *http.Request) {
 	sessionID := r.PathValue("sessionId")
 	sess := p.mgr.Get(sessionID)
@@ -194,6 +314,7 @@ func (p *Pipeline) HandleStopSession(w http.ResponseWriter, r *http.Request) {
 
 	duration := time.Since(sess.CreatedAt)
 	sess.SetStatus(session.StatusStopped)
+	p.tts.Disable(sessionID)
 
 	statusData, _ := json.Marshal(map[string]string{"status": "stopped"})
 	p.broker.Publish(sessionID, sse.Event{
@@ -205,10 +326,67 @@ func (p *Pipeline) HandleStopSession(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(5 * time.Second)
 		p.mgr.Remove(sessionID)
 		p.removeSegmenter(sessionID)
+		p.removeTTSChunker(sessionID)
 	}()
 
 	log.Printf("[session] stopped id=%s dur=%s", sessionID, duration.Round(time.Second))
 	w.Write([]byte(`{"status":"stopped"}`))
+}
+
+// HandleDebugCorrection injects test sentences and fires a correction for
+// manual verification of the correction UI animation.
+func (p *Pipeline) HandleDebugCorrection(w http.ResponseWriter, r *http.Request) {
+	sessionID := r.PathValue("sessionId")
+	sess := p.mgr.Get(sessionID)
+	if sess == nil {
+		http.Error(w, `{"error":"session not found"}`, http.StatusNotFound)
+		return
+	}
+
+	// Seed 6 varied sentences so the correction window has enough data.
+	pairs := [][2]string{
+		{"The transformer architecture revolutionized NLP.", "Transformer架构革新了自然语言处理。"},
+		{"It uses self-attention to process sequences.", "它使用自注意力来处理序列。"},
+		{"The model computes attention weights.", "该模型计算注意力权重。"},
+		{"Attention helps the model focus on relevant tokens.", "注意力帮助模型聚焦于相关标记。"},
+		{"The decoder generates output tokens one by one.", "解码器逐一生成输出标记。"},
+		{"This approach has become the foundation of modern AI.", "这种方法已成为现代AI的基础。"},
+	}
+	for _, pair := range pairs {
+		sess.AppendSentence(pair[0], pair[1], "A")
+	}
+
+	// Force a correction on the first sentence (segment index 0).
+	oldText := pairs[0][1]
+	newText := "Transformer架构彻底改变了自然语言处理领域。"
+	newRev := int(2)
+
+	if sess.ApplyCorrection(0, newText, newRev) {
+		p.eventMu.Lock()
+		p.eventID++
+		id := p.eventID
+		p.eventMu.Unlock()
+		corrEvt := sse.BuildCorrection(id, 0, oldText, newText, newRev)
+		p.broker.Publish(sessionID, corrEvt)
+		log.Printf("[debug] correction published session=%s segmentId=0 old=%q new=%q",
+			sessionID, oldText, newText)
+	}
+
+	// Also publish the 6 subtitle.final events first so the client has them.
+	p.eventMu.Lock()
+	for i, pair := range pairs {
+		p.eventID++
+		evt := sse.BuildSubtitleFinal(p.eventID, i, pair[0], pair[1], "A")
+		p.broker.Publish(sessionID, evt)
+	}
+	// Re-publish correction after subtitles to ensure it's processed after them.
+	p.eventID++
+	corrEvt2 := sse.BuildCorrection(p.eventID, 0, oldText, newText, newRev)
+	p.broker.Publish(sessionID, corrEvt2)
+	p.eventMu.Unlock()
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(`{"status":"ok","message":"6 test sentences + correction sent"}`))
 }
 
 var _ = io.Discard
@@ -230,4 +408,47 @@ func (p *Pipeline) removeSegmenter(sessionID string) {
 	p.segmentersMu.Lock()
 	delete(p.segmenters, sessionID)
 	p.segmentersMu.Unlock()
+}
+
+func (p *Pipeline) ttsChunkerFor(sessionID string) *tts.StreamChunker {
+	p.ttsChunkersMu.Lock()
+	defer p.ttsChunkersMu.Unlock()
+
+	chunker := p.ttsChunkers[sessionID]
+	if chunker == nil {
+		chunker = tts.NewStreamChunker()
+		p.ttsChunkers[sessionID] = chunker
+	}
+	return chunker
+}
+
+func (p *Pipeline) removeTTSChunker(sessionID string) {
+	p.ttsChunkersMu.Lock()
+	delete(p.ttsChunkers, sessionID)
+	p.ttsChunkersMu.Unlock()
+}
+
+// refreshBackgroundSummary asynchronously asks the LLM to summarize the
+// conversation domain, key terminology, and speaker perspective, then
+// stores the result in the session for future translation prompts.
+func (p *Pipeline) refreshBackgroundSummary(sessionID string, sess *session.Session) {
+	sentences := sess.GetWindow(20)
+	if len(sentences) < 10 {
+		return
+	}
+	existing := sess.GetBackgroundSummary()
+	summary, err := p.transl.SummarizeBackground(sentences, existing)
+	if err != nil {
+		log.Printf("[summarize] failed session=%s err=%v", sessionID, err)
+		return
+	}
+	sess.SetBackgroundSummary(summary)
+	log.Printf("[summarize] updated session=%s len=%d", sessionID, len(summary))
+
+	p.eventMu.Lock()
+	p.eventID++
+	evt := sse.BuildBackgroundSummary(p.eventID, summary, len(sentences))
+	p.eventMu.Unlock()
+	p.broker.Publish(sessionID, evt)
+	log.Printf("[sse] published background.summary session=%s", sessionID)
 }

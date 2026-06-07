@@ -8,6 +8,7 @@ class SubtitleEntry {
   final int segmentId;
   final String original; // English ASR text
   final String translation; // Chinese translation
+  final String speaker; // speaker label, e.g. "A", "B", ""
   final int revision; // starts at 1, incremented per correction
   final DateTime createdAt;
   final SubtitleStatus status;
@@ -23,6 +24,7 @@ class SubtitleEntry {
     required this.translation,
     required this.revision,
     required this.createdAt,
+    this.speaker = '',
     this.status = SubtitleStatus.finalText,
     this.isFinal = true,
     this.eventSeq,
@@ -35,6 +37,7 @@ class SubtitleEntry {
     int? segmentId,
     String? original,
     String? translation,
+    String? speaker,
     int? revision,
     DateTime? createdAt,
     SubtitleStatus? status,
@@ -48,6 +51,7 @@ class SubtitleEntry {
       segmentId: segmentId ?? this.segmentId,
       original: original ?? this.original,
       translation: translation ?? this.translation,
+      speaker: speaker ?? this.speaker,
       revision: revision ?? this.revision,
       createdAt: createdAt ?? this.createdAt,
       status: status ?? this.status,

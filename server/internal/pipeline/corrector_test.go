@@ -14,7 +14,7 @@ func TestNeedsCorrectionTooFewSentences(t *testing.T) {
 
 	// 少于 6 句，永远不触发
 	for range 4 {
-		s.AppendSentence("text", "译文")
+		s.AppendSentence("text", "译文", "")
 	}
 	if c.NeedsCorrection(s) {
 		t.Fatal("should not trigger with < 6 sentences")
@@ -28,10 +28,10 @@ func TestNeedsCorrectionAtTriggerPoint(t *testing.T) {
 
 	// 添加 6 句（seq=6, 6%3==0 → 触发）
 	for range 5 {
-		s.AppendSentence("text", "译文")
+		s.AppendSentence("text", "译文", "")
 	}
 	// 第 6 句
-	s.AppendSentence("text6", "译文6")
+	s.AppendSentence("text6", "译文6", "")
 
 	if !c.NeedsCorrection(s) {
 		t.Fatal("should trigger when window >= 6")
@@ -45,7 +45,7 @@ func TestNeedsCorrectionNotAtNonTriggerPoint(t *testing.T) {
 
 	// 添加 7 句（seq=7, 7%3!=0 → 不触发）
 	for range 7 {
-		s.AppendSentence("text", "译文")
+		s.AppendSentence("text", "译文", "")
 	}
 
 	if c.NeedsCorrection(s) {
@@ -64,7 +64,7 @@ func TestBuildCorrectionPrompt(t *testing.T) {
 		{Index: 0, Original: "The cat sat.", Translation: "猫坐着。"},
 	}
 
-	prompt := c.BuildCorrectionPrompt(window, lookback)
+	prompt := c.BuildCorrectionPrompt(window, lookback, "这是一段关于猫的对话。")
 
 	// prompt 应包含原文
 	if !strings.Contains(prompt, "The cat sat.") {

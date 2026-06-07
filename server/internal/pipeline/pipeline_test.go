@@ -219,6 +219,53 @@ func TestHandleStopSession_NotFound(t *testing.T) {
 	}
 }
 
+func TestHandleTTSControl_DisableValidSession(t *testing.T) {
+	pipe, mgr, _ := setupTestServer()
+	mgr.Create("sess_tts_disable")
+
+	req := httptest.NewRequest("POST", "/api/v1/sessions/sess_tts_disable/tts",
+		strings.NewReader(`{"enabled":false}`))
+	req.SetPathValue("sessionId", "sess_tts_disable")
+	rec := httptest.NewRecorder()
+
+	pipe.HandleTTSControl(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestHandleTTSControl_EnableRequiresConfig(t *testing.T) {
+	pipe, mgr, _ := setupTestServer()
+	mgr.Create("sess_tts_config")
+
+	req := httptest.NewRequest("POST", "/api/v1/sessions/sess_tts_config/tts",
+		strings.NewReader(`{"enabled":true}`))
+	req.SetPathValue("sessionId", "sess_tts_config")
+	rec := httptest.NewRecorder()
+
+	pipe.HandleTTSControl(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", rec.Code)
+	}
+}
+
+func TestHandleTTSControl_SessionNotFound(t *testing.T) {
+	pipe, _, _ := setupTestServer()
+
+	req := httptest.NewRequest("POST", "/api/v1/sessions/missing/tts",
+		strings.NewReader(`{"enabled":true}`))
+	req.SetPathValue("sessionId", "missing")
+	rec := httptest.NewRecorder()
+
+	pipe.HandleTTSControl(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", rec.Code)
+	}
+}
+
 func TestFullPipelineFlow(t *testing.T) {
 	// Step-by-step integration: create → upload → SSE verify → stop
 	pipe, mgr, broker := setupTestServer()

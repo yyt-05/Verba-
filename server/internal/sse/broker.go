@@ -1,6 +1,7 @@
 package sse
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -14,6 +15,9 @@ const (
 	EventSubtitlePartial   = "subtitle.partial"
 	EventSubtitleFinal     = "subtitle.final"
 	EventSubtitleCorrected = "subtitle.corrected"
+	EventTTSAudioDelta     = "tts.audio.delta"
+	EventTTSAudioReset     = "tts.audio.reset"
+	EventBackgroundSummary = "background.summary"
 	EventWarning           = "warning"
 	EventError             = "error"
 )
@@ -125,12 +129,13 @@ func (b *Broker) HandleSSE(w http.ResponseWriter, r *http.Request) {
 }
 
 // BuildSubtitleFinal creates a finalized subtitle event.
-func BuildSubtitleFinal(id int, segmentID int, original, translation string) Event {
+func BuildSubtitleFinal(id int, segmentID int, original, translation, speaker string) Event {
 	body, _ := json.Marshal(map[string]interface{}{
 		"segmentId":   segmentID,
 		"segmentSeq":  segmentID,
 		"original":    original,
 		"translation": translation,
+		"speaker":     speaker,
 		"revision":    1,
 		"status":      "final",
 		"isFinal":     true,
@@ -171,6 +176,49 @@ func BuildCorrection(id int, segmentID int, oldText, newText string, revision in
 		Revision:   revision,
 		Status:     "corrected",
 		IsFinal:    true,
+	}
+}
+
+// BuildTTSAudioDelta creates a TTS PCM audio chunk event.
+func BuildTTSAudioDelta(id int, audio []byte) Event {
+	body, _ := json.Marshal(map[string]interface{}{
+		"audio":      base64.StdEncoding.EncodeToString(audio),
+		"encoding":   "pcm_s16le",
+		"sampleRate": 24000,
+		"channels":   1,
+	})
+	return Event{
+		ID:       id,
+		Type:     EventTTSAudioDelta,
+		Data:     body,
+		EventSeq: id,
+	}
+}
+
+// BuildTTSAudioReset tells the client to drop queued TTS audio and catch up.
+func BuildTTSAudioReset(id int) Event {
+	body, _ := json.Marshal(map[string]interface{}{
+		"reason": "catch_up",
+	})
+	return Event{
+		ID:       id,
+		Type:     EventTTSAudioReset,
+		Data:     body,
+		EventSeq: id,
+	}
+}
+
+// BuildBackgroundSummary creates an event carrying the AI-generated context summary.
+func BuildBackgroundSummary(id int, summary string, sentenceCount int) Event {
+	body, _ := json.Marshal(map[string]interface{}{
+		"summary":       summary,
+		"sentenceCount": sentenceCount,
+	})
+	return Event{
+		ID:       id,
+		Type:     EventBackgroundSummary,
+		Data:     body,
+		EventSeq: id,
 	}
 }
 

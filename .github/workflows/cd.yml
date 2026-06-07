@@ -1,8 +1,16 @@
 name: CD
 
 on:
+  workflow_dispatch:
+    inputs:
+      deploy_web:
+        description: Deploy Flutter web to GitHub Pages
+        required: false
+        default: false
+        type: boolean
   push:
-    branches: [main, master]
+    tags:
+      - "release-*"
 
 permissions:
   contents: write
@@ -11,7 +19,20 @@ permissions:
 
 jobs:
   release-server:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact: verba-linux-amd64
+            package: verba-linux-amd64
+          - os: windows-latest
+            artifact: verba-windows-amd64.exe
+            package: verba-windows-amd64.exe
+          - os: macos-latest
+            artifact: verba-darwin-amd64
+            package: verba-darwin-amd64
+    runs-on: ${{ matrix.os }}
     defaults:
       run:
         working-directory: server
@@ -20,23 +41,38 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version: "1.25"
-      - name: cross build
-        run: |
-          GOOS=linux   GOARCH=amd64 go build -o verba-linux-amd64   ./cmd/verba
-          GOOS=windows GOARCH=amd64 go build -o verba-windows-amd64.exe ./cmd/verba
-          GOOS=darwin  GOARCH=amd64 go build -o verba-darwin-amd64  ./cmd/verba
+      - name: install Linux audio dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev pkg-config
+      - name: build server
+        run: go build -o ${{ matrix.artifact }} ./cmd/verba
+      - name: upload server artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.package }}
+          path: server/${{ matrix.artifact }}
+
+  create-release:
+    needs: release-server
+    runs-on: ubuntu-latest
+    steps:
+      - name: download server artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
       - name: create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            server/verba-linux-amd64
-            server/verba-windows-amd64.exe
-            server/verba-darwin-amd64
-          tag_name: release-${{ github.run_id }}
+            dist/verba-linux-amd64/verba-linux-amd64
+            dist/verba-windows-amd64.exe/verba-windows-amd64.exe
+            dist/verba-darwin-amd64/verba-darwin-amd64
+          tag_name: ${{ github.event_name == 'push' && github.ref_name || format('release-{0}', github.run_id) }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   deploy-web:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_web == 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

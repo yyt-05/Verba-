@@ -99,7 +99,7 @@ func TestPublishDropsOnFullChannel(t *testing.T) {
 }
 
 func TestBuildSubtitleFinal(t *testing.T) {
-	evt := BuildSubtitleFinal(100, 7, "Hello", "你好")
+	evt := BuildSubtitleFinal(100, 7, "Hello", "你好", "A")
 	if evt.ID != 100 {
 		t.Fatalf("expected ID 100, got %d", evt.ID)
 	}
@@ -145,7 +145,7 @@ func TestBuildCorrection(t *testing.T) {
 }
 
 func TestSubtitleEventsCarryRevisionStatusAndSequence(t *testing.T) {
-	finalEvt := BuildSubtitleFinal(200, 9, "Hello", "你好")
+	finalEvt := BuildSubtitleFinal(200, 9, "Hello", "你好", "A")
 	if finalEvt.EventSeq != 200 {
 		t.Fatalf("expected eventSeq 200, got %d", finalEvt.EventSeq)
 	}

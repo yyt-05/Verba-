@@ -2,6 +2,8 @@
 
 Verba 是一个面向 Windows 桌面的 AI 实时双语字幕助手。它通过 WASAPI 捕获系统音频，把音频分片上传到 Go 后端，再由后端完成语音识别、翻译和修正，并通过 SSE 把字幕结果推送回 Flutter 客户端。
 
+![alt text](image.png)
+
 ## 项目结构
 
 ```text

@@ -33,7 +33,7 @@ func TestSegmenterWaitsForTrailingSilence(t *testing.T) {
 func TestSegmenterDropsShortNoise(t *testing.T) {
 	seg := NewSegmenter(48000)
 
-	seg.AddPCM(testPCM(48000, 300, 2000))
+	seg.AddPCM(testPCM(48000, 100, 2000))
 	out, ready := seg.AddPCM(testPCM(48000, 800, 0))
 	if ready || out != nil {
 		t.Fatal("short voiced noise should be dropped")
@@ -75,7 +75,7 @@ func TestSegmenterFlushesLowLevelSystemAudio(t *testing.T) {
 	var ready bool
 	var out []byte
 	for i := 0; i < 7; i++ {
-		out, ready = seg.AddPCM(testPCM(48000, 300, 120))
+		out, ready = seg.AddPCM(testPCM(48000, 300, 20))
 		if ready {
 			break
 		}

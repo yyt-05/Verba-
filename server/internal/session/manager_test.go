@@ -38,7 +38,7 @@ func TestAppendSentence(t *testing.T) {
 
 	// 前 2 句不应该触发修正（< 6 句）
 	for i := range 2 {
-		seg, shouldCorrect := s.AppendSentence("text", "译文")
+		seg, shouldCorrect := s.AppendSentence("text", "译文", "")
 		if seg.Index != i {
 			t.Fatalf("expected index %d, got %d", i, seg.Index)
 		}
@@ -49,7 +49,7 @@ func TestAppendSentence(t *testing.T) {
 
 	// 补到 6 句——循环最后一轮(index=5, seq=6)触发修正（6%3==0）
 	for range 4 {
-		seg, sc := s.AppendSentence("text", "译文")
+		seg, sc := s.AppendSentence("text", "译文", "")
 		// 第 6 句触发
 		if seg.Index == 5 && !sc {
 			t.Fatal("shouldCorrect should be true at seq=6")
@@ -57,9 +57,9 @@ func TestAppendSentence(t *testing.T) {
 	}
 	// 补到 9 句——seq=9 触发（9%3==0）
 	for range 2 {
-		s.AppendSentence("text", "译文")
+		s.AppendSentence("text", "译文", "")
 	}
-	seg, shouldCorrect := s.AppendSentence("text8", "译文8")
+	seg, shouldCorrect := s.AppendSentence("text8", "译文8", "")
 	if seg.Index != 8 {
 		t.Fatalf("expected index 8, got %d", seg.Index)
 	}
@@ -79,10 +79,10 @@ func TestAppendSentenceNoTriggerOnNonMultiple(t *testing.T) {
 
 	// 添加 6 句（seq=6, 6%3==0, 触发修正）
 	for range 6 {
-		s.AppendSentence("text", "译文")
+		s.AppendSentence("text", "译文", "")
 	}
 	// 再添加 1 句（seq=7, 7%3!=0, 不触发）
-	_, shouldCorrect := s.AppendSentence("text7", "译文7")
+	_, shouldCorrect := s.AppendSentence("text7", "译文7", "")
 	if shouldCorrect {
 		t.Fatal("shouldCorrect should be false when seq%3 != 0")
 	}
@@ -93,7 +93,7 @@ func TestGetWindow(t *testing.T) {
 	s := mgr.Create("sess_window")
 
 	for i := range 15 {
-		s.AppendSentence("text", "译文")
+		s.AppendSentence("text", "译文", "")
 		_ = i
 	}
 
@@ -114,7 +114,7 @@ func TestGetWindow(t *testing.T) {
 	mgr2 := NewManager(nil)
 	s2 := mgr2.Create("sess_small")
 	for range 4 {
-		s2.AppendSentence("t", "t")
+		s2.AppendSentence("t", "t", "")
 	}
 	w2 := s2.GetWindow(12)
 	if len(w2) != 4 {
@@ -126,7 +126,7 @@ func TestApplyCorrection(t *testing.T) {
 	mgr := NewManager(nil)
 	s := mgr.Create("sess_corr")
 
-	s.AppendSentence("hello world", "你好世界") // index=0, rev=1
+	s.AppendSentence("hello world", "你好世界", "") // index=0, rev=1
 
 	// 高版本覆盖
 	ok := s.ApplyCorrection(0, "你好，世界", 2)
@@ -154,7 +154,7 @@ func TestApplyCorrectionWrongIndex(t *testing.T) {
 	mgr := NewManager(nil)
 	s := mgr.Create("sess_wrong")
 
-	s.AppendSentence("text", "译文")
+	s.AppendSentence("text", "译文", "")
 
 	ok := s.ApplyCorrection(999, "不存在", 2)
 	if ok {
@@ -185,7 +185,7 @@ func TestManagerThreadSafety(t *testing.T) {
 		go func() {
 			s := mgr.Get("sess_ts")
 			if s != nil {
-				s.AppendSentence("concurrent", "并发测试")
+				s.AppendSentence("concurrent", "并发测试", "")
 			}
 			done <- true
 		}()

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/subtitle_entry.dart';
 import '../../theme/verba_theme.dart';
+import '../../utils/translation_correction_diff.dart';
 import 'floating_icon.dart';
 import 'glass_surface.dart';
 
@@ -42,6 +43,7 @@ class SlidingSubtitlePane extends StatelessWidget {
                         color: VerbaColors.inkWhite,
                         fontSize: 16,
                         fontWeight: FontWeight.w900,
+                        decoration: TextDecoration.none,
                       ),
                     ),
                     const Spacer(),
@@ -51,6 +53,7 @@ class SlidingSubtitlePane extends StatelessWidget {
                         color: VerbaColors.mutedGray,
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
+                        decoration: TextDecoration.none,
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -73,6 +76,7 @@ class SlidingSubtitlePane extends StatelessWidget {
                           style: TextStyle(
                             color: VerbaColors.mutedGray,
                             fontWeight: FontWeight.w700,
+                            decoration: TextDecoration.none,
                           ),
                         ),
                       )
@@ -94,30 +98,95 @@ class SlidingSubtitlePane extends StatelessWidget {
   }
 }
 
-class _SubtitleRow extends StatelessWidget {
+class _SubtitleRow extends StatefulWidget {
   final SubtitleEntry entry;
 
   const _SubtitleRow({required this.entry});
 
   @override
+  State<_SubtitleRow> createState() => _SubtitleRowState();
+}
+
+class _SubtitleRowState extends State<_SubtitleRow>
+    with SingleTickerProviderStateMixin {
+  AnimationController? _flashController;
+
+  @override
+  void didUpdateWidget(covariant _SubtitleRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!oldWidget.entry.isCorrected && widget.entry.isCorrected) {
+      _triggerFlash();
+    }
+  }
+
+  void _triggerFlash() {
+    _flashController?.dispose();
+    _flashController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+    _flashController!
+      ..addListener(() => setState(() {}))
+      ..forward().then((_) {
+        if (mounted) {
+          _flashController?.dispose();
+          _flashController = null;
+          setState(() {});
+        }
+      });
+  }
+
+  @override
+  void dispose() {
+    _flashController?.dispose();
+    super.dispose();
+  }
+
+  Color _flashBg() {
+    if (_flashController == null || !_flashController!.isAnimating) {
+      return Colors.transparent;
+    }
+    final t = Curves.easeOut.transform(_flashController!.value);
+    return Color.lerp(
+      VerbaColors.accentYellow.withValues(alpha: 0.18),
+      Colors.transparent,
+      t,
+    )!;
+  }
+
+  Color _newTextColor() {
+    if (_flashController == null || !_flashController!.isAnimating) {
+      return VerbaColors.inkWhite;
+    }
+    final t = Curves.easeOut.transform(_flashController!.value);
+    return Color.lerp(VerbaColors.accentYellow, VerbaColors.inkWhite, t)!;
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final entry = widget.entry;
+    final showCorrection =
+        entry.isCorrected &&
+        entry.oldTranslation != null &&
+        entry.oldTranslation!.isNotEmpty;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.fromLTRB(10, 6, 8, 7),
       decoration: BoxDecoration(
-        color: entry.isCorrected
-            ? VerbaColors.accentYellow.withValues(alpha: 0.06)
-            : Colors.transparent,
+        color: showCorrection
+            ? _flashBg()
+            : Colors.white.withValues(alpha: 0.02),
         borderRadius: BorderRadius.circular(8),
-        border: entry.isCorrected
-            ? const Border(
-                left: BorderSide(color: VerbaColors.accentYellow, width: 3),
-              )
-            : null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (entry.speaker.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 3),
+              child: _MiniSpeakerBadge(label: entry.speaker),
+            ),
           Text(
             entry.original,
             maxLines: 2,
@@ -126,64 +195,131 @@ class _SubtitleRow extends StatelessWidget {
               color: VerbaColors.inkWhite.withValues(alpha: 0.58),
               fontSize: 12,
               fontWeight: FontWeight.w600,
+              decoration: TextDecoration.none,
             ),
           ),
-          const SizedBox(height: 2),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Text(
+          SizedBox(height: showCorrection ? 2 : 3),
+          showCorrection
+              ? _CorrectionTranslationText(
+                  oldText: entry.oldTranslation!,
+                  newText: entry.translation,
+                  newTextColor: _newTextColor(),
+                )
+              : Text(
                   entry.translation,
-                  maxLines: 2,
+                  maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: VerbaColors.inkWhite,
                     fontSize: 15,
                     fontWeight: FontWeight.w800,
+                    height: 1.35,
+                    decoration: TextDecoration.none,
                   ),
                 ),
-              ),
-              if (entry.isCorrected) const _CorrectionBadge(),
-            ],
-          ),
-          if (entry.isCorrected && entry.oldTranslation != null)
-            Text(
-              '原译：${entry.oldTranslation}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: VerbaColors.mutedGray.withValues(alpha: 0.66),
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
         ],
       ),
     );
   }
 }
 
-class _CorrectionBadge extends StatelessWidget {
-  const _CorrectionBadge();
+class _CorrectionTranslationText extends StatelessWidget {
+  final String oldText;
+  final String newText;
+  final Color newTextColor;
+
+  const _CorrectionTranslationText({
+    required this.oldText,
+    required this.newText,
+    required this.newTextColor,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(left: 8, top: 2),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: VerbaColors.accentYellow.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(8),
+    const baseStyle = TextStyle(
+      color: VerbaColors.inkWhite,
+      fontSize: 15,
+      fontWeight: FontWeight.w800,
+      height: 1.35,
+      decoration: TextDecoration.none,
+    );
+
+    return RichText(
+      maxLines: 3,
+      overflow: TextOverflow.ellipsis,
+      text: TextSpan(
+        style: baseStyle,
+        children:
+            buildTranslationCorrectionParts(
+              oldText: oldText,
+              newText: newText,
+            ).map((part) {
+              if (part.kind == TranslationCorrectionPartKind.oldText) {
+                return TextSpan(
+                  text: part.text,
+                  style: baseStyle.copyWith(
+                    color: VerbaColors.mutedGray.withValues(alpha: 0.6),
+                    decoration: TextDecoration.lineThrough,
+                    decorationColor: VerbaColors.mutedGray.withValues(
+                      alpha: 0.5,
+                    ),
+                    decorationThickness: 1.5,
+                  ),
+                );
+              }
+              if (part.kind == TranslationCorrectionPartKind.newText) {
+                return TextSpan(
+                  text: part.text,
+                  style: baseStyle.copyWith(color: newTextColor),
+                );
+              }
+              return TextSpan(text: part.text);
+            }).toList(),
       ),
-      child: const Text(
-        '修正',
-        style: TextStyle(
-          color: VerbaColors.accentYellow,
-          fontSize: 10,
-          fontWeight: FontWeight.w900,
+    );
+  }
+}
+
+Color _speakerColor(String label) {
+  if (label.isEmpty) return Colors.grey;
+  final c = label.codeUnitAt(0);
+  const palette = [
+    Color(0xFF4A9EFF),
+    Color(0xFF12C76A),
+    Color(0xFFFF8C42),
+    Color(0xFFC084FC),
+    Color(0xFFF472B6),
+  ];
+  final idx = (c - 65).clamp(0, palette.length - 1);
+  return palette[idx];
+}
+
+class _MiniSpeakerBadge extends StatelessWidget {
+  final String label;
+  const _MiniSpeakerBadge({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _speakerColor(label);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 6,
+          height: 6,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
-      ),
+        const SizedBox(width: 3),
+        Text(
+          '说话人 $label',
+          style: TextStyle(
+            color: color.withValues(alpha: 0.8),
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            decoration: TextDecoration.none,
+          ),
+        ),
+      ],
     );
   }
 }

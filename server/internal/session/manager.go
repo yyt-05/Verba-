@@ -22,10 +22,11 @@ const (
 
 // Sentence holds one subtitle segment.
 type Sentence struct {
-	Index       int       // global increment within session
-	Original    string    // English ASR text
-	Translation string    // Chinese translation
-	Revision    int       // starts at 1, incremented on correction
+	Index       int    // global increment within session
+	Original    string // English ASR text
+	Translation string // Chinese translation
+	Speaker     string // speaker label, e.g. "A", "B", ""
+	Revision    int    // starts at 1, incremented on correction
 	CreatedAt   time.Time
 }
 
@@ -36,6 +37,13 @@ type Session struct {
 	CreatedAt time.Time
 	Sentences []Sentence
 	Seq       int // next sentence index
+
+	// Background context — AI-generated summary of topic/terminology/domain.
+	// Updated every ~10 sentences to guide more accurate translation.
+	BackgroundSummary string
+
+	// Speaker tracking
+	CurrentSpeaker string // "A", "B", etc.
 
 	// Correction window state
 	WindowHash string // hash of the current 12-sentence window
@@ -87,7 +95,7 @@ func (m *Manager) Remove(id string) {
 }
 
 // AppendSentence adds a new sentence and returns whether correction should be triggered.
-func (s *Session) AppendSentence(original, translation string) (sentence Sentence, shouldCorrect bool) {
+func (s *Session) AppendSentence(original, translation, speaker string) (sentence Sentence, shouldCorrect bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -96,16 +104,47 @@ func (s *Session) AppendSentence(original, translation string) (sentence Sentenc
 		Index:       s.Seq,
 		Original:    original,
 		Translation: translation,
+		Speaker:     speaker,
 		Revision:    1,
 		CreatedAt:   time.Now(),
 	}
 	s.Sentences = append(s.Sentences, seg)
 	s.Seq++
+	if speaker != "" {
+		s.CurrentSpeaker = speaker
+	}
 
 	// Trigger correction every 3 new sentences, when window has ≥6 sentences
 	shouldCorrect = len(s.Sentences) >= 6 && s.Seq%3 == 0
 
 	return seg, shouldCorrect
+}
+
+func (s *Session) GetCurrentSpeaker() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.CurrentSpeaker
+}
+
+func (s *Session) SetCurrentSpeaker(speaker string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.CurrentSpeaker = speaker
+}
+
+func (s *Session) NextSpeakerLabel() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.CurrentSpeaker == "" {
+		return "A"
+	}
+	if s.CurrentSpeaker == "A" {
+		return "B"
+	}
+	if s.CurrentSpeaker == "B" {
+		return "C"
+	}
+	return "A"
 }
 
 // GetWindow returns the last N sentences for the correction context window.
@@ -146,4 +185,24 @@ func (s *Session) SetStatus(status Status) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.Status = status
+}
+
+func (s *Session) SetBackgroundSummary(summary string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.BackgroundSummary = summary
+}
+
+func (s *Session) GetBackgroundSummary() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.BackgroundSummary
+}
+
+// NeedBackgroundSummary returns true when it's time to refresh the context summary.
+// Triggers every 10 sentences after the 10th sentence.
+func (s *Session) NeedBackgroundSummary() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.Sentences) >= 10 && len(s.Sentences)%10 == 0
 }

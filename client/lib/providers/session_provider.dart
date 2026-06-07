@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/subtitle_entry.dart';
 import '../services/api_client.dart';
+import '../services/tts_pcm_player.dart';
 import '../services/wasapi_capture.dart';
 
 enum SessionState {
@@ -23,21 +24,29 @@ class SessionNotifier extends StateNotifier<SessionState> {
   final ApiClient api;
   final SubtitleListNotifier subtitleList;
   final WasapiCapture wasapi;
+  final TtsPcmPlayer ttsPlayer;
   String? _sessionId;
   Timer? _uploadTimer;
   StreamSubscription<String>? _sseSub;
   bool _startedWasapi = false;
   bool _uploadInFlight = false;
+  bool _ttsDesired = false;
+  void Function(String)? onBackgroundSummary;
 
   SessionNotifier({
     required this.api,
     required this.subtitleList,
     required this.wasapi,
+    required this.ttsPlayer,
   }) : super(SessionState.idle);
 
   String? get sessionId => _sessionId;
 
   Future<void> startListening() async {
+    // Stop any in-progress session first to avoid race conditions
+    if (_sessionId != null) {
+      await stopListening();
+    }
     state = SessionState.connecting;
     try {
       if (!wasapi.isCapturing) {
@@ -50,6 +59,11 @@ class SessionNotifier extends StateNotifier<SessionState> {
       }
 
       _sessionId = await api.createSession();
+      if (_ttsDesired) {
+        await api.setTtsEnabled(_sessionId!, true);
+      }
+      subtitleList.clear();
+      onBackgroundSummary?.call('');
       state = SessionState.listening;
 
       _sseSub?.cancel();
@@ -69,6 +83,7 @@ class SessionNotifier extends StateNotifier<SessionState> {
         wasapi.stop();
         _startedWasapi = false;
       }
+      _sessionId = null;
       state = SessionState.apiError;
     }
   }
@@ -88,6 +103,7 @@ class SessionNotifier extends StateNotifier<SessionState> {
         segmentId: (data['segmentId'] as int?) ?? 0,
         original: cleanSubtitleText((data['original'] as String?) ?? ''),
         translation: cleanSubtitleText((data['translation'] as String?) ?? ''),
+        speaker: (data['speaker'] as String?) ?? '',
         revision: (data['revision'] as int?) ?? 1,
         createdAt: DateTime.now(),
         status: status,
@@ -102,6 +118,19 @@ class SessionNotifier extends StateNotifier<SessionState> {
       final rev = (data['revision'] as int?) ?? 1;
       final oldText = cleanSubtitleText((data['oldText'] as String?) ?? '');
       subtitleList.applyCorrection(segId, newText, rev, oldText: oldText);
+    } else if (type == 'tts.audio.delta') {
+      final audio = data['audio'] as String?;
+      if (audio == null || audio.isEmpty) return;
+      try {
+        ttsPlayer.playPcm24kMono16(base64Decode(audio));
+      } catch (_) {}
+    } else if (type == 'tts.audio.reset') {
+      ttsPlayer.dispose();
+    } else if (type == 'background.summary') {
+      final summary = (data['summary'] as String?) ?? '';
+      if (summary.isNotEmpty) {
+        onBackgroundSummary?.call(summary);
+      }
     }
   }
 
@@ -120,6 +149,8 @@ class SessionNotifier extends StateNotifier<SessionState> {
   }
 
   Future<void> stopListening() async {
+    final sid = _sessionId;
+    _sessionId = null;
     _uploadTimer?.cancel();
     _uploadTimer = null;
     _uploadInFlight = false;
@@ -129,13 +160,28 @@ class SessionNotifier extends StateNotifier<SessionState> {
       wasapi.stop();
       _startedWasapi = false;
     }
+    ttsPlayer.dispose();
 
-    if (_sessionId == null) return;
+    if (sid == null) return;
     try {
-      await api.stopSession(_sessionId!);
+      await api.stopSession(sid);
     } catch (_) {}
-    _sessionId = null;
     state = SessionState.stopped;
+  }
+
+  Future<bool> setTtsEnabled(bool enabled) async {
+    final sessionId = _sessionId;
+    if (sessionId == null) {
+      _ttsDesired = enabled;
+      return false;
+    }
+    try {
+      await api.setTtsEnabled(sessionId, enabled);
+      _ttsDesired = enabled;
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   @override
@@ -146,6 +192,7 @@ class SessionNotifier extends StateNotifier<SessionState> {
       wasapi.stop();
       _startedWasapi = false;
     }
+    ttsPlayer.dispose();
     super.dispose();
   }
 }
@@ -265,7 +312,16 @@ class SubtitleListNotifier extends StateNotifier<List<SubtitleEntry>> {
 }
 
 /// Providers
+
+final backgroundSummaryProvider = StateProvider<String>((ref) => '');
+
 final wasapiProvider = Provider<WasapiCapture>((ref) => WasapiCapture());
+
+final ttsPcmPlayerProvider = Provider<TtsPcmPlayer>((ref) {
+  final player = TtsPcmPlayer();
+  ref.onDispose(player.dispose);
+  return player;
+});
 
 final apiClientProvider = Provider<ApiClient>((ref) {
   return ApiClient(baseUrl: 'http://localhost:8080');
@@ -279,9 +335,14 @@ final subtitleListProvider =
 final sessionProvider = StateNotifierProvider<SessionNotifier, SessionState>((
   ref,
 ) {
-  return SessionNotifier(
+  final notifier = SessionNotifier(
     api: ref.watch(apiClientProvider),
     subtitleList: ref.watch(subtitleListProvider.notifier),
     wasapi: ref.watch(wasapiProvider),
+    ttsPlayer: ref.watch(ttsPcmPlayerProvider),
   );
+  notifier.onBackgroundSummary = (summary) {
+    ref.read(backgroundSummaryProvider.notifier).state = summary;
+  };
+  return notifier;
 });
