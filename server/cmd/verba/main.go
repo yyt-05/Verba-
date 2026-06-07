@@ -33,6 +33,9 @@ func main() {
 	// GET /api/v1/sessions/{sessionId}/events — SSE event stream
 	mux.HandleFunc("GET /api/v1/sessions/{sessionId}/events", broker.HandleSSE)
 
+	// POST /api/v1/sessions/{sessionId}/tts — toggle realtime TTS
+	mux.HandleFunc("POST /api/v1/sessions/{sessionId}/tts", pipe.HandleTTSControl)
+
 	// POST /api/v1/sessions/{sessionId}/stop — stop session
 	mux.HandleFunc("POST /api/v1/sessions/{sessionId}/stop", pipe.HandleStopSession)
 

@@ -138,6 +138,19 @@ class SessionNotifier extends StateNotifier<SessionState> {
     state = SessionState.stopped;
   }
 
+  Future<bool> setTtsEnabled(bool enabled) async {
+    final sessionId = _sessionId;
+    if (sessionId == null) {
+      return false;
+    }
+    try {
+      await api.setTtsEnabled(sessionId, enabled);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   @override
   void dispose() {
     _uploadTimer?.cancel();

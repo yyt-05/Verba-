@@ -1,12 +1,14 @@
 package pipeline
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/verba/server/internal/session"
@@ -43,6 +45,7 @@ type chatRequest struct {
 	Model       string        `json:"model"`
 	Messages    []chatMessage `json:"messages"`
 	Temperature float64       `json:"temperature"`
+	Stream      bool          `json:"stream,omitempty"`
 }
 
 type chatResponse struct {
@@ -51,9 +54,99 @@ type chatResponse struct {
 	} `json:"choices"`
 }
 
+type chatStreamResponse struct {
+	Choices []struct {
+		Delta chatMessage `json:"delta"`
+	} `json:"choices"`
+}
+
 // Translate converts English text to Chinese without additional context.
 func (t *Translator) Translate(englishText string) (string, error) {
 	return t.TranslateWithContext(englishText, nil)
+}
+
+// TranslateStreamWithContext streams Chinese translation deltas when the
+// provider supports OpenAI-compatible streaming, and returns the final text.
+func (t *Translator) TranslateStreamWithContext(englishText string, recent []session.Sentence, onDelta func(string)) (string, error) {
+	if t.apiKey == "" {
+		result, err := t.TranslateWithContext(englishText, recent)
+		if err == nil && onDelta != nil {
+			onDelta(result)
+		}
+		return result, err
+	}
+
+	start := time.Now()
+	body := chatRequest{
+		Model: t.model,
+		Messages: []chatMessage{
+			{Role: "system", Content: translateSystemPrompt()},
+			{Role: "user", Content: buildTranslatePrompt(englishText, recent)},
+		},
+		Temperature: 0.1,
+		Stream:      true,
+	}
+
+	payload, _ := json.Marshal(body)
+	url := t.baseURL + "/chat/completions"
+	req, err := http.NewRequest("POST", url, bytes.NewReader(payload))
+	if err != nil {
+		return "", fmt.Errorf("translate stream request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+t.apiKey)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "text/event-stream")
+
+	log.Printf("[translate] stream request model=%s text=%q context=%d", t.model, englishText, len(recent))
+	resp, err := t.client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("translate stream call: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("translate stream http %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var result bytes.Buffer
+	scanner := bufio.NewScanner(resp.Body)
+	scanner.Buffer(make([]byte, 1024), 1024*1024)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || !strings.HasPrefix(line, "data:") {
+			continue
+		}
+		data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+		if data == "[DONE]" {
+			break
+		}
+
+		var chunk chatStreamResponse
+		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
+			continue
+		}
+		for _, choice := range chunk.Choices {
+			delta := choice.Delta.Content
+			if delta == "" {
+				continue
+			}
+			result.WriteString(delta)
+			if onDelta != nil {
+				onDelta(delta)
+			}
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return "", fmt.Errorf("translate stream read: %w", err)
+	}
+
+	text := result.String()
+	log.Printf("[translate] stream response text=%q dur=%dms", text, time.Since(start).Milliseconds())
+	if text == "" {
+		return "", fmt.Errorf("translate stream empty response")
+	}
+	return text, nil
 }
 
 // TranslateWithContext converts English text to Chinese using recent finalized subtitles.

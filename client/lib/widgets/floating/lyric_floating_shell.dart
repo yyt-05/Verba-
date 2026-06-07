@@ -21,6 +21,7 @@ class LyricFloatingShell extends ConsumerStatefulWidget {
 class _LyricFloatingShellState extends ConsumerState<LyricFloatingShell> {
   FloatingPanel _panel = FloatingPanel.lyric;
   bool _hovering = false;
+  bool _ttsEnabled = false;
   double _fontScale = 1.0;
 
   @override
@@ -109,6 +110,7 @@ class _LyricFloatingShellState extends ConsumerState<LyricFloatingShell> {
                                       _panel == FloatingPanel.lyric,
                                   child: FloatingControlBar(
                                     subtitleCount: subtitles.length,
+                                    ttsEnabled: _ttsEnabled,
                                     onOpenSubtitles: () => setState(
                                       () => _panel = FloatingPanel.subtitles,
                                     ),
@@ -117,6 +119,7 @@ class _LyricFloatingShellState extends ConsumerState<LyricFloatingShell> {
                                     ),
                                     onFontDown: () => _changeFontScale(-0.1),
                                     onFontUp: () => _changeFontScale(0.1),
+                                    onToggleTts: _toggleTts,
                                     onStop: _stopListening,
                                   ),
                                 ),
@@ -147,6 +150,7 @@ class _LyricFloatingShellState extends ConsumerState<LyricFloatingShell> {
   void _stopListening() {
     setState(() {
       _panel = FloatingPanel.lyric;
+      _ttsEnabled = false;
     });
     ref.read(sessionProvider.notifier).stopListening();
   }
@@ -154,6 +158,15 @@ class _LyricFloatingShellState extends ConsumerState<LyricFloatingShell> {
   void _changeFontScale(double delta) {
     setState(() {
       _fontScale = (_fontScale + delta).clamp(0.7, 1.65).toDouble();
+    });
+  }
+
+  Future<void> _toggleTts() async {
+    final next = !_ttsEnabled;
+    final ok = await ref.read(sessionProvider.notifier).setTtsEnabled(next);
+    if (!mounted) return;
+    setState(() {
+      _ttsEnabled = ok ? next : false;
     });
   }
 }
