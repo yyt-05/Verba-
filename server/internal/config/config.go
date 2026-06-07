@@ -14,6 +14,11 @@ type Config struct {
 	SiliconFlowBaseURL   string
 	ASRModel             string
 	TranslateModel       string
+	DiarizationProvider  string
+	DeepgramAPIKey       string
+	DeepgramRealtimeURL  string
+	DeepgramModel        string
+	DeepgramLanguage     string
 	TTSProvider          string
 	DashScopeAPIKey      string
 	DashScopeRealtimeURL string
@@ -33,6 +38,11 @@ func Load() *Config {
 		SiliconFlowBaseURL:   envOrDefault("SILICONFLOW_BASE_URL", "https://api.siliconflow.cn/v1"),
 		ASRModel:             envOrDefault("VERBA_ASR_MODEL", "FunAudioLLM/SenseVoiceSmall"),
 		TranslateModel:       envOrDefault("VERBA_TRANSLATE_MODEL", "deepseek-ai/DeepSeek-V3"),
+		DiarizationProvider:  envOrDefault("VERBA_DIARIZATION_PROVIDER", ""),
+		DeepgramAPIKey:       os.Getenv("DEEPGRAM_API_KEY"),
+		DeepgramRealtimeURL:  envOrDefault("DEEPGRAM_REALTIME_URL", "wss://api.deepgram.com/v1/listen"),
+		DeepgramModel:        envOrDefault("DEEPGRAM_MODEL", "nova-3"),
+		DeepgramLanguage:     envOrDefault("DEEPGRAM_LANGUAGE", "en"),
 		TTSProvider:          envOrDefault("VERBA_TTS_PROVIDER", "dashscope"),
 		DashScopeAPIKey:      os.Getenv("DASHSCOPE_API_KEY"),
 		DashScopeRealtimeURL: envOrDefault("DASHSCOPE_REALTIME_URL", "wss://dashscope.aliyuncs.com/api-ws/v1/realtime"),
