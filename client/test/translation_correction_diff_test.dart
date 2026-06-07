@@ -16,6 +16,33 @@ void main() {
     ]);
   });
 
+  test('keeps long shared subtitle context outside the correction highlight', () {
+    final parts = buildTranslationCorrectionParts(
+      oldText: '有个研究员像电影里那样冲进房间，噢着“天哪”。',
+      newText: '有个研究员像电影里那样冲进房间，惊呼“天哪”。',
+    );
+
+    expect(parts.map((part) => '${part.kind}:${part.text}').toList(), [
+      'TranslationCorrectionPartKind.unchanged:有个研究员像电影里那样冲进房间，',
+      'TranslationCorrectionPartKind.oldText:噢着',
+      'TranslationCorrectionPartKind.newText:惊呼',
+      'TranslationCorrectionPartKind.unchanged:“天哪”。',
+    ]);
+    expect(shouldShowInlineCorrectionParts(parts, '有个研究员像电影里那样冲进房间，惊呼“天哪”。'), true);
+  });
+
+  test('hides inline correction when the change would repeat whole subtitles', () {
+    final parts = buildTranslationCorrectionParts(
+      oldText: '收藏量破千，太疯狂了。我原本很期待。',
+      newText: '很久没用了，现在用起来还挺有意思的。',
+    );
+
+    expect(
+      shouldShowInlineCorrectionParts(parts, '很久没用了，现在用起来还挺有意思的。'),
+      false,
+    );
+  });
+
   test('does not mark identical text as a correction', () {
     final parts = buildTranslationCorrectionParts(
       oldText: '云端代码封装在简单易用的界面里。',

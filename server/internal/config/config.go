@@ -19,6 +19,10 @@ type Config struct {
 	DeepgramRealtimeURL  string
 	DeepgramModel        string
 	DeepgramLanguage     string
+	TencentASRAppID      string
+	TencentASRSecretID   string
+	TencentASRSecretKey  string
+	TencentASRModel      string
 	TTSProvider          string
 	DashScopeAPIKey      string
 	DashScopeRealtimeURL string
@@ -43,6 +47,10 @@ func Load() *Config {
 		DeepgramRealtimeURL:  envOrDefault("DEEPGRAM_REALTIME_URL", "wss://api.deepgram.com/v1/listen"),
 		DeepgramModel:        envOrDefault("DEEPGRAM_MODEL", "nova-3"),
 		DeepgramLanguage:     envOrDefault("DEEPGRAM_LANGUAGE", "en"),
+		TencentASRAppID:      os.Getenv("TENCENT_ASR_APP_ID"),
+		TencentASRSecretID:   os.Getenv("TENCENT_ASR_SECRET_ID"),
+		TencentASRSecretKey:  os.Getenv("TENCENT_ASR_SECRET_KEY"),
+		TencentASRModel:      envOrDefault("TENCENT_ASR_ENGINE_MODEL_TYPE", "16k_zh_en_speaker"),
 		TTSProvider:          envOrDefault("VERBA_TTS_PROVIDER", "dashscope"),
 		DashScopeAPIKey:      os.Getenv("DASHSCOPE_API_KEY"),
 		DashScopeRealtimeURL: envOrDefault("DASHSCOPE_REALTIME_URL", "wss://dashscope.aliyuncs.com/api-ws/v1/realtime"),

@@ -1,6 +1,7 @@
 package tts
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -18,7 +19,7 @@ func TestStreamChunkerWaitsOnShortSoftBoundary(t *testing.T) {
 func TestStreamChunkerFlushesStrongBoundary(t *testing.T) {
 	chunker := NewStreamChunker()
 	now := time.Now()
-	text := "\u8fd9\u662f\u4e00\u6bb5\u5df2\u7ecf\u5b8c\u6574\u7684\u4e2d\u6587\u53e5\u5b50\u3002"
+	text := "\u8fd9\u662f\u4e00\u6bb5\u5df2\u7ecf\u5b8c\u6574\u7684\u4e2d\u6587\u53e5\u5b50\uff0c\u957f\u5ea6\u8db3\u591f\u8ba9\u8bed\u97f3\u8fde\u7eed\u64ad\u653e\u3002"
 
 	got := chunker.Add(text, now)
 	if len(got) != 1 || got[0] != text {
@@ -26,10 +27,20 @@ func TestStreamChunkerFlushesStrongBoundary(t *testing.T) {
 	}
 }
 
+func TestStreamChunkerWaitsOnShortStrongBoundary(t *testing.T) {
+	chunker := NewStreamChunker()
+	now := time.Now()
+
+	got := chunker.Add("\u6211\u660e\u767d\u4e86\u3002", now)
+	if len(got) != 0 {
+		t.Fatalf("expected short strong-boundary text to wait, got %#v", got)
+	}
+}
+
 func TestStreamChunkerFlushesSoftBoundaryAfterTargetLength(t *testing.T) {
 	chunker := NewStreamChunker()
 	now := time.Now()
-	text := "\u8fd9\u662f\u4e00\u6bb5\u8db3\u591f\u957f\u7684\u4e2d\u6587\u5185\u5bb9\u7528\u6765\u6d4b\u8bd5\u5f31\u8fb9\u754c\u662f\u5426\u4f1a\u5728\u8fbe\u5230\u76ee\u6807\u957f\u5ea6\u540e\u5207\u5206\uff0c"
+	text := strings.Repeat("\u8fde\u7eed\u4e2d\u6587", 12) + "\uff0c"
 
 	got := chunker.Add(text, now)
 	if len(got) != 1 || got[0] != text {
@@ -40,7 +51,7 @@ func TestStreamChunkerFlushesSoftBoundaryAfterTargetLength(t *testing.T) {
 func TestStreamChunkerTimeoutFlushesLongText(t *testing.T) {
 	chunker := NewStreamChunker()
 	start := time.Now()
-	text := "\u8fd9\u662f\u4e00\u6bb5\u6ca1\u6709\u6807\u70b9\u4f46\u662f\u5df2\u7ecf\u8db3\u591f\u957f\u7684\u4e2d\u6587\u5185\u5bb9\u7528\u6765\u6d4b\u8bd5\u8d85\u65f6\u5207\u5206"
+	text := strings.Repeat("\u6ca1\u6709\u6807\u70b9", 12)
 
 	if got := chunker.Add(text, start); len(got) != 0 {
 		t.Fatalf("expected initial text to wait, got %#v", got)

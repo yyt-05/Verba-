@@ -11,3 +11,4 @@
 - [修正效果设计](correction-effect.md)
 - [全局 UI 流程](global-ui-flow.svg)
 - [修正流程 UI](correction-flow-ui.svg)
+- [Realtime TTS Playback](realtime-tts-playback.md)

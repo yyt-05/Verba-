@@ -126,6 +126,12 @@ class SessionNotifier extends StateNotifier<SessionState> {
       } catch (_) {}
     } else if (type == 'tts.audio.reset') {
       ttsPlayer.dispose();
+    } else if (type == 'subtitle.speaker') {
+      final segId = (data['segmentId'] as int?) ?? 0;
+      final spk = (data['speaker'] as String?) ?? '';
+      if (spk.isNotEmpty) {
+        subtitleList.applySpeaker(segId, spk);
+      }
     } else if (type == 'background.summary') {
       final summary = (data['summary'] as String?) ?? '';
       if (summary.isNotEmpty) {
@@ -287,6 +293,15 @@ class SubtitleListNotifier extends StateNotifier<List<SubtitleEntry>> {
     return false;
   }
 
+  void applySpeaker(int segmentId, String speaker) {
+    state = state.map((e) {
+      if (e.segmentId == segmentId && e.speaker != speaker) {
+        return e.copyWith(speaker: speaker);
+      }
+      return e;
+    }).toList();
+  }
+
   void applyCorrection(
     int segmentId,
     String newTranslation,
@@ -295,13 +310,16 @@ class SubtitleListNotifier extends StateNotifier<List<SubtitleEntry>> {
   }) {
     state = state.map((e) {
       if (e.segmentId == segmentId && revision > e.revision) {
+        final previousTranslation = e.translation.isNotEmpty
+            ? e.translation
+            : oldText;
         return e.copyWith(
           translation: newTranslation,
           revision: revision,
           status: SubtitleStatus.corrected,
           isFinal: true,
           isCorrected: true,
-          oldTranslation: oldText?.isNotEmpty == true ? oldText : e.translation,
+          oldTranslation: previousTranslation,
         );
       }
       return e;

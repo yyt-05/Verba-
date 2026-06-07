@@ -78,37 +78,11 @@ func (s *Session) Enqueue(text string) {
 	if s.closed {
 		return
 	}
-	if len(s.textCh) >= 4 {
-		dropped := 0
-		for {
-			select {
-			case <-s.textCh:
-				dropped++
-			default:
-				if dropped > 0 {
-					log.Printf("[tts] catch up by dropping stale queued text session=%s dropped=%d", s.id, dropped)
-					if s.cfg.OnReset != nil {
-						s.cfg.OnReset(s.id)
-					}
-				}
-				goto enqueue
-			}
-		}
-	}
-enqueue:
+
 	select {
 	case s.textCh <- text:
-	default:
-		select {
-		case dropped := <-s.textCh:
-			log.Printf("[tts] dropping stale text because queue is full session=%s text=%q", s.id, dropped)
-		default:
-		}
-		select {
-		case s.textCh <- text:
-		default:
-			log.Printf("[tts] dropping text because queue is full session=%s text=%q", s.id, text)
-		}
+	case <-s.ctx.Done():
+		return
 	}
 }
 

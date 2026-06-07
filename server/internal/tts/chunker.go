@@ -7,12 +7,12 @@ import (
 )
 
 const (
-	minChunkRunes      = 12
-	targetChunkRunes   = 28
-	softMaxChunkRunes  = 42
-	hardMaxChunkRunes  = 56
-	firstChunkMaxWait  = 500 * time.Millisecond
-	normalChunkMaxWait = 750 * time.Millisecond
+	minChunkRunes      = 18
+	targetChunkRunes   = 44
+	softMaxChunkRunes  = 64
+	hardMaxChunkRunes  = 88
+	firstChunkMaxWait  = 1200 * time.Millisecond
+	normalChunkMaxWait = 1500 * time.Millisecond
 	forceMinTailRunes  = 4
 )
 

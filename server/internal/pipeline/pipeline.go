@@ -37,6 +37,10 @@ type Pipeline struct {
 }
 
 func New(cfg *config.Config, mgr *session.Manager, broker *sse.Broker) *Pipeline {
+	diarizationModel := cfg.DeepgramModel
+	if cfg.DiarizationProvider == "tencent" {
+		diarizationModel = cfg.TencentASRModel
+	}
 	pipe := &Pipeline{
 		cfg:    cfg,
 		mgr:    mgr,
@@ -59,10 +63,16 @@ func New(cfg *config.Config, mgr *session.Manager, broker *sse.Broker) *Pipeline
 		Provider:    cfg.DiarizationProvider,
 		APIKey:      cfg.DeepgramAPIKey,
 		RealtimeURL: cfg.DeepgramRealtimeURL,
-		Model:       cfg.DeepgramModel,
+		Model:       diarizationModel,
 		Language:    cfg.DeepgramLanguage,
+		AppID:       cfg.TencentASRAppID,
+		SecretID:    cfg.TencentASRSecretID,
+		SecretKey:   cfg.TencentASRSecretKey,
 		OnFinal: func(sessionID string, transcript diarization.Transcript) {
-			pipe.handleFinalTranscript(sessionID, transcript.Text, transcript.Speaker)
+			pipe.applyDiarizationSpeaker(sessionID, transcript.Speaker)
+		},
+		OnFallback: func(sessionID string, fallback diarization.AudioFallback) {
+			// Main ASR path handles transcription; fallback does nothing
 		},
 	})
 	pipe.tts = tts.NewManager(tts.Config{
@@ -157,13 +167,13 @@ func (p *Pipeline) HandleUploadAudio(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[audio] received session=%s bytes=%d rms=%.1f dur=%dms",
 		sessionID, len(body), rms, time.Since(start).Milliseconds())
 
+	// Send audio to diarization in parallel (speaker labels only, non-blocking).
 	if p.diar.Enabled() {
-		if err := p.diar.AddPCM(sessionID, body); err != nil {
-			log.Printf("[WARN] diarization audio send failed session=%s err=%v", sessionID, err)
-		}
-		w.WriteHeader(http.StatusAccepted)
-		w.Write([]byte(`{"status":"streaming"}`))
-		return
+		go func() {
+			if err := p.diar.AddPCM(sessionID, body); err != nil {
+				log.Printf("[WARN] diarization audio send failed session=%s err=%v", sessionID, err)
+			}
+		}()
 	}
 
 	segment, ready := p.segmenterFor(sessionID).AddPCM(body)
@@ -184,12 +194,18 @@ func (p *Pipeline) HandleUploadAudio(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if englishText == "" {
-		// Silent or unrecognized audio; skip.
 		w.WriteHeader(http.StatusAccepted)
 		w.Write([]byte(`{"status":"ok"}`))
 		return
 	}
-
+	if isChineseText(englishText) {
+		// TTS echo — discard captured Chinese speech.
+		log.Printf("[audio] discarded TTS echo session=%s text=%q", sessionID, englishText)
+		w.WriteHeader(http.StatusAccepted)
+		w.Write([]byte(`{"status":"ok"}`))
+		return
+		return
+	}
 	speaker := sess.GetCurrentSpeaker()
 	if speaker == "" {
 		speaker = "A"
@@ -207,6 +223,9 @@ func (p *Pipeline) handleFinalTranscript(sessionID, englishText, speaker string)
 		return
 	}
 	if englishText == "" {
+		return
+	}
+	if isChineseText(englishText) {
 		return
 	}
 	if speaker == "" {
@@ -282,6 +301,55 @@ func (p *Pipeline) handleFinalTranscript(sessionID, englishText, speaker string)
 		}
 	}
 
+}
+
+// applyDiarizationSpeaker retroactively sets the speaker label on the most
+// recent subtitle segment that lacks one, then publishes a speaker update event.
+func (p *Pipeline) applyDiarizationSpeaker(sessionID, speaker string) {
+	if speaker == "" {
+		return
+	}
+	sess := p.mgr.Get(sessionID)
+	if sess == nil {
+		return
+	}
+	sentences := sess.GetWindow(6)
+	for i := len(sentences) - 1; i >= 0; i-- {
+		if sentences[i].Speaker != speaker {
+			if sess.ApplySpeaker(sentences[i].Index, speaker) {
+				evt := sse.BuildSpeakerUpdate(p.nextEventID(), sentences[i].Index, speaker)
+				p.broker.Publish(sessionID, evt)
+				log.Printf("[diarization] speaker assigned session=%s segment=%d speaker=%s",
+					sessionID, sentences[i].Index, speaker)
+				sess.SetCurrentSpeaker(speaker)
+			}
+			return
+		}
+	}
+}
+
+func (p *Pipeline) handleFallbackAudio(sessionID string, pcm []byte) {
+	sess := p.mgr.Get(sessionID)
+	if sess == nil || len(pcm) == 0 {
+		return
+	}
+	wavAudio := audio.WriteWAVHeader(48000, pcm)
+	englishText, err := p.asr.Transcribe(wavAudio)
+	if err != nil {
+		return
+	}
+	if englishText == "" {
+		return
+	}
+	if englishText == "" {
+		return
+	}
+	speaker := sess.GetCurrentSpeaker()
+	if speaker == "" {
+		speaker = "A"
+	}
+	log.Printf("[diarization] fallback ASR subtitle session=%s speaker=%s", sessionID, speaker)
+	p.handleFinalTranscript(sessionID, englishText, speaker)
 }
 
 // translateForSession translates a finalized transcript for one session.
@@ -486,4 +554,19 @@ func (p *Pipeline) refreshBackgroundSummary(sessionID string, sess *session.Sess
 	p.eventMu.Unlock()
 	p.broker.Publish(sessionID, evt)
 	log.Printf("[sse] published background.summary session=%s", sessionID)
+}
+
+// isChineseText returns true when the text appears to be Chinese (likely TTS echo).
+func isChineseText(text string) bool {
+	runes := []rune(text)
+	if len(runes) == 0 {
+		return false
+	}
+	cjk := 0
+	for _, r := range runes {
+		if r >= 0x4E00 && r <= 0x9FFF {
+			cjk++
+		}
+	}
+	return float64(cjk)/float64(len(runes)) > 0.25
 }

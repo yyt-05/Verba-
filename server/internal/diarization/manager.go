@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 )
 
 type stream interface {
@@ -25,7 +26,14 @@ func NewManager(cfg Config) *Manager {
 }
 
 func (m *Manager) Enabled() bool {
-	return strings.EqualFold(m.cfg.Provider, "deepgram") && m.cfg.APIKey != ""
+	switch strings.ToLower(m.cfg.Provider) {
+	case "deepgram":
+		return m.cfg.APIKey != ""
+	case "tencent":
+		return m.cfg.AppID != "" && m.cfg.SecretID != "" && m.cfg.SecretKey != ""
+	default:
+		return false
+	}
 }
 
 func (m *Manager) Start(sessionID string) error {
@@ -42,6 +50,13 @@ func (m *Manager) Start(sessionID string) error {
 	switch strings.ToLower(m.cfg.Provider) {
 	case "deepgram":
 		s, err := newDeepgramStream(m.cfg, sessionID)
+		if err != nil {
+			return err
+		}
+		m.streams[sessionID] = s
+		return nil
+	case "tencent":
+		s, err := newTencentStream(m.cfg, sessionID)
 		if err != nil {
 			return err
 		}
@@ -71,7 +86,31 @@ func (m *Manager) AddPCM(sessionID string, pcm []byte) error {
 	if s == nil {
 		return nil
 	}
-	return s.SendPCM(pcm)
+
+	// Split large chunks to avoid overwhelming the diarization API.
+	// Tencent rejects >3 seconds of audio per send.
+	const maxChunkBytes = 2 * 48000 * 2 // 2 seconds of 48kHz PCM16
+	for offset := 0; offset < len(pcm); offset += maxChunkBytes {
+		end := offset + maxChunkBytes
+		if end > len(pcm) {
+			end = len(pcm)
+		}
+		chunk := pcm[offset:end]
+		if err := s.SendPCM(chunk); err != nil {
+			m.mu.Lock()
+			if m.streams[sessionID] == s {
+				s.Close()
+				delete(m.streams, sessionID)
+			}
+			m.mu.Unlock()
+			return err
+		}
+		// Small pacing delay between chunks to respect rate limits.
+		if end < len(pcm) {
+			time.Sleep(200 * time.Millisecond)
+		}
+	}
+	return nil
 }
 
 func (m *Manager) Stop(sessionID string) {

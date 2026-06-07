@@ -63,6 +63,27 @@ void main() {
       expect(entry.oldTranslation, '旧译文');
     });
 
+    test('applyCorrection 使用当前完整译文作为修正前文本', () {
+      notifier.addSubtitle(SubtitleEntry(
+        segmentId: 3,
+        original: 'There was a researcher...',
+        translation: '有个研究员像电影里那样冲进房间，噢着“天哪”。',
+        revision: 1,
+        createdAt: DateTime.now(),
+      ));
+
+      notifier.applyCorrection(
+        3,
+        '有个研究员像电影里那样冲进房间，惊呼“天哪”。',
+        2,
+        oldText: '噢着',
+      );
+
+      final entry = notifier.state[0];
+      expect(entry.translation, '有个研究员像电影里那样冲进房间，惊呼“天哪”。');
+      expect(entry.oldTranslation, '有个研究员像电影里那样冲进房间，噢着“天哪”。');
+    });
+
     test('applyCorrection 低版本号被拒绝', () {
       notifier.addSubtitle(SubtitleEntry(
         segmentId: 1,

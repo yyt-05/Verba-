@@ -75,10 +75,19 @@ class _SubtitleItemState extends State<SubtitleItem>
   @override
   Widget build(BuildContext context) {
     final entry = widget.entry;
-    final showCorrection =
+    final canCompareCorrection =
         entry.isCorrected &&
         entry.oldTranslation != null &&
         entry.oldTranslation!.isNotEmpty;
+    final correctionParts = canCompareCorrection
+        ? buildTranslationCorrectionParts(
+            oldText: entry.oldTranslation!,
+            newText: entry.translation,
+          )
+        : const <TranslationCorrectionPart>[];
+    final showCorrection =
+        canCompareCorrection &&
+        shouldShowInlineCorrectionParts(correctionParts, entry.translation);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -112,8 +121,7 @@ class _SubtitleItemState extends State<SubtitleItem>
           SizedBox(height: showCorrection ? 2 : 3),
           showCorrection
               ? _CorrectionTranslationText(
-                  oldText: entry.oldTranslation!,
-                  newText: entry.translation,
+                  parts: correctionParts,
                   newTextColor: _newTranslationColor(),
                 )
               : Text(
@@ -133,13 +141,11 @@ class _SubtitleItemState extends State<SubtitleItem>
 }
 
 class _CorrectionTranslationText extends StatelessWidget {
-  final String oldText;
-  final String newText;
+  final List<TranslationCorrectionPart> parts;
   final Color newTextColor;
 
   const _CorrectionTranslationText({
-    required this.oldText,
-    required this.newText,
+    required this.parts,
     required this.newTextColor,
   });
 
@@ -157,10 +163,7 @@ class _CorrectionTranslationText extends StatelessWidget {
       text: TextSpan(
         style: baseStyle,
         children:
-            buildTranslationCorrectionParts(
-              oldText: oldText,
-              newText: newText,
-            ).map((part) {
+            parts.map((part) {
               if (part.kind == TranslationCorrectionPartKind.oldText) {
                 return TextSpan(
                   text: part.text,

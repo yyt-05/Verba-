@@ -181,6 +181,20 @@ func (s *Session) ApplyCorrection(index int, newTranslation string, revision int
 	return false
 }
 
+// ApplySpeaker sets the speaker label on a sentence, overwriting any existing label.
+func (s *Session) ApplySpeaker(index int, speaker string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for i := range s.Sentences {
+		if s.Sentences[i].Index == index {
+			s.Sentences[i].Speaker = speaker
+			return true
+		}
+	}
+	return false
+}
+
 func (s *Session) SetStatus(status Status) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -182,22 +182,3 @@ Get-NetTCPConnection -LocalPort 8080 -ErrorAction SilentlyContinue |
 flutter run -d windows
 ```
 
-### 部分旧文档中文乱码
-
-现有部分文档可能存在历史编码问题。这个 README 使用 UTF-8 保存，建议用 VS Code、Cursor 等现代编辑器查看。
-
-## README 一般应该写什么
-
-一个实用的 README 通常会介绍：
-
-- 项目是什么，解决什么问题。
-- 技术栈和目录结构。
-- 运行前需要安装什么工具。
-- 环境变量和配置方式。
-- 如何启动后端、前端或完整项目。
-- 如何验证服务是否运行成功。
-- 测试、构建、打包命令。
-- 常见错误和解决办法。
-- 更详细文档的位置。
-
-本项目更详细的产品、设计和测试说明在 `docs/` 目录中；开发规范在 `CLAUDE.md` 中。

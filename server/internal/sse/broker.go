@@ -18,6 +18,7 @@ const (
 	EventTTSAudioDelta     = "tts.audio.delta"
 	EventTTSAudioReset     = "tts.audio.reset"
 	EventBackgroundSummary = "background.summary"
+	EventSubtitleSpeaker   = "subtitle.speaker"
 	EventWarning           = "warning"
 	EventError             = "error"
 )
@@ -219,6 +220,22 @@ func BuildBackgroundSummary(id int, summary string, sentenceCount int) Event {
 		Type:     EventBackgroundSummary,
 		Data:     body,
 		EventSeq: id,
+	}
+}
+
+// BuildSpeakerUpdate creates an event that retroactively assigns a speaker
+// label to a previously published subtitle segment.
+func BuildSpeakerUpdate(id int, segmentID int, speaker string) Event {
+	body, _ := json.Marshal(map[string]interface{}{
+		"segmentId": segmentID,
+		"speaker":   speaker,
+	})
+	return Event{
+		ID:        id,
+		Type:      EventSubtitleSpeaker,
+		Data:      body,
+		EventSeq:  id,
+		SegmentID: segmentID,
 	}
 }
 

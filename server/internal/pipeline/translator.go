@@ -141,7 +141,7 @@ func (t *Translator) TranslateStreamWithContext(englishText string, recent []ses
 		return "", fmt.Errorf("translate stream read: %w", err)
 	}
 
-	text := result.String()
+	text := sanitizeCurrentTranslation(result.String(), recent)
 	log.Printf("[translate] stream response text=%q dur=%dms", text, time.Since(start).Milliseconds())
 	if text == "" {
 		return "", fmt.Errorf("translate stream empty response")
@@ -195,9 +195,40 @@ func (t *Translator) TranslateWithContext(englishText string, recent []session.S
 		return "", fmt.Errorf("translate empty response")
 	}
 
-	result := cr.Choices[0].Message.Content
+	result := sanitizeCurrentTranslation(cr.Choices[0].Message.Content, recent)
 	log.Printf("[translate] response text=%q dur=%dms", result, time.Since(start).Milliseconds())
 	return result, nil
+}
+
+func sanitizeCurrentTranslation(text string, recent []session.Sentence) string {
+	result := strings.TrimSpace(text)
+	if result == "" || len(recent) == 0 {
+		return result
+	}
+
+	changed := true
+	for changed {
+		changed = false
+		for i := len(recent) - 1; i >= 0; i-- {
+			context := strings.TrimSpace(recent[i].Translation)
+			if context == "" || !strings.HasPrefix(result, context) {
+				continue
+			}
+
+			remainder := strings.TrimSpace(strings.TrimPrefix(result, context))
+			remainder = strings.TrimLeft(remainder, " \t\r\n，。！？、；：,.!?;:")
+			remainder = strings.TrimSpace(remainder)
+			if remainder == "" {
+				continue
+			}
+
+			result = remainder
+			changed = true
+			break
+		}
+	}
+
+	return result
 }
 
 func translateSystemPrompt(background string) string {
@@ -446,8 +477,15 @@ func (t *Translator) Correct(prompt string) ([]CorrectionSuggestion, error) {
 		return nil, fmt.Errorf("correct empty response")
 	}
 
+	raw := cr.Choices[0].Message.Content
+	raw = strings.TrimSpace(raw)
+	raw = strings.TrimPrefix(raw, "```json")
+	raw = strings.TrimPrefix(raw, "```")
+	raw = strings.TrimSuffix(raw, "```")
+	raw = strings.TrimSpace(raw)
+
 	var suggestions []CorrectionSuggestion
-	if err := json.Unmarshal([]byte(cr.Choices[0].Message.Content), &suggestions); err != nil {
+	if err := json.Unmarshal([]byte(raw), &suggestions); err != nil {
 		log.Printf("[corrector] parse suggestions failed: %v raw=%q", err, cr.Choices[0].Message.Content)
 		return nil, nil
 	}

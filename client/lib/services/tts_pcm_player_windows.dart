@@ -3,6 +3,8 @@ import 'dart:ffi';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'tts_playback_buffer.dart';
+
 final class _WaveFormatEx extends Struct {
   @Uint16()
   external int wFormatTag;
@@ -59,10 +61,9 @@ class _PendingWave {
 }
 
 class TtsPcmPlayer {
-  static const int _blockBytes = 1920; // 40 ms at 24 kHz, mono, s16le.
-  static const int _prebufferBytes = 14400; // 300 ms.
-  static const int _targetQueuedBytes = 14400; // 300 ms.
-  static const int _maxInputBytes = 96000; // 2 seconds.
+  static const int _blockBytes = 3840; // 80 ms at 24 kHz, mono, s16le.
+  static const int _prebufferBytes = 38400; // 800 ms.
+  static const int _targetQueuedBytes = 48000; // 1000 ms.
   static const int _waveFormatPcm = 1;
   static const int _waveMapper = 0xffffffff;
   static const int _callbackNull = 0;
@@ -141,7 +142,7 @@ class TtsPcmPlayer {
       >('waveOutClose');
 
   final List<_PendingWave> _pending = [];
-  final List<int> _buffer = [];
+  final TtsPlaybackBuffer _buffer = TtsPlaybackBuffer();
   Timer? _startupTimer;
   Timer? _pumpTimer;
   Timer? _cleanupTimer;
@@ -154,9 +155,8 @@ class TtsPcmPlayer {
   void playPcm24kMono16(Uint8List pcm) {
     if (!Platform.isWindows) return;
     if (pcm.isEmpty) return;
-    _buffer.addAll(pcm);
+    _buffer.append(pcm);
     _lastInputAt = DateTime.now();
-    _trimInputBuffer();
 
     if (!_started) {
       if (_buffer.length >= _prebufferBytes) {
@@ -202,7 +202,7 @@ class TtsPcmPlayer {
     final inputIdle =
         lastInputAt != null &&
         DateTime.now().difference(lastInputAt) >
-            const Duration(milliseconds: 160);
+            const Duration(milliseconds: 700);
     if (_queuedBytes == 0 && _buffer.isNotEmpty && inputIdle) {
       _submitPcm(_takeBytes(_buffer.length));
     }
@@ -327,15 +327,7 @@ class TtsPcmPlayer {
   }
 
   Uint8List _takeBytes(int byteCount) {
-    final n = byteCount.clamp(0, _buffer.length);
-    final out = Uint8List.fromList(_buffer.sublist(0, n));
-    _buffer.removeRange(0, n);
-    return out;
-  }
-
-  void _trimInputBuffer() {
-    if (_buffer.length <= _maxInputBytes) return;
-    _buffer.removeRange(0, _buffer.length - _maxInputBytes);
+    return _buffer.take(byteCount);
   }
 
   Pointer<_WaveFormatEx> _allocWaveFormat() {

@@ -94,6 +94,26 @@ List<TranslationCorrectionPart> buildTranslationCorrectionParts({
   return result;
 }
 
+bool shouldShowInlineCorrectionParts(
+  List<TranslationCorrectionPart> parts,
+  String newText,
+) {
+  var oldLength = 0;
+  var newLength = 0;
+  for (final part in parts) {
+    if (part.kind == TranslationCorrectionPartKind.oldText) {
+      oldLength += part.text.runes.length;
+    } else if (part.kind == TranslationCorrectionPartKind.newText) {
+      newLength += part.text.runes.length;
+    }
+  }
+
+  if (oldLength == 0 || newLength == 0) return true;
+  final replacementLength = oldLength > newLength ? oldLength : newLength;
+  final limit = (newText.runes.length * 0.45).ceil();
+  return replacementLength <= (limit < 8 ? 8 : limit);
+}
+
 List<TranslationCorrectionPart> _prefixSuffixDiff(
   String oldValue,
   String newValue,
