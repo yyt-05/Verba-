@@ -204,7 +204,6 @@ func (p *Pipeline) HandleUploadAudio(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusAccepted)
 		w.Write([]byte(`{"status":"ok"}`))
 		return
-		return
 	}
 	speaker := sess.GetCurrentSpeaker()
 	if speaker == "" {
